@@ -16,6 +16,8 @@
 
 #### Tf Flowers
 [📓 Kaggle Jupyter Notebook](https://www.kaggle.com/olgabelitskaya/tf-flowers)
+#### TF DCGAN
+[📓 Kaggle Jupyter Notebook](https://www.kaggle.com/olgabelitskaya/tf-dcgan)
 #### Images of Biospecies
 [📓 Kaggle Jupyter Notebook](https://www.kaggle.com/olgabelitskaya/images-of-biospecies)
 #### Images of Biospecies 2
