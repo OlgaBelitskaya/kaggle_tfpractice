@@ -16,6 +16,12 @@
 
 #### Tf Flowers
 [📓 Kaggle Jupyter Notebook](https://www.kaggle.com/olgabelitskaya/tf-flowers)
+#### Images of Biospecies
+[📓 Kaggle Jupyter Notebook](https://www.kaggle.com/olgabelitskaya/images-of-biospecies)
+#### Images of Biospecies 2
+[📓 Kaggle Jupyter Notebook](https://www.kaggle.com/olgabelitskaya/images-of-biospecies-2)
+#### Images of Biospecies 3
+[📓 Kaggle Jupyter Notebook](https://www.kaggle.com/olgabelitskaya/images-of-biospecies-3)
 
 ---
 
