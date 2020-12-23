@@ -11,6 +11,7 @@ Reading classics [Python Machine Learning 3rd Edition](https://github.com/rasbt/
 
 # Commented out IPython magic to ensure Python compatibility.
 from IPython.display import display,HTML
+
 c1,c2,f1,f2,fs1,fs2=\
 '#11ff66','#6611ff','Wallpoet','Orbitron',20,10
 def dhtml(string,fontcolor=c1,font=f1,fontsize=fs1):
@@ -23,51 +24,30 @@ def dhtml(string,fontcolor=c1,font=f1,fontsize=fs1):
     """; font-size:"""+str(fontsize)+"""px;'>
 #     %s</h1>"""%string))
 
-!pip install mplcyberpunk
-
 dhtml('Code Modules, Setting, & Functions')
 
-import warnings,imageio,urllib,mplcyberpunk
+!python3 -m pip install --upgrade pip \
+--user --quiet --no-warn-script-location
+!python3 -m pip install --upgrade tensorflow==2.3.0 \
+--user --quiet --no-warn-script-location
+!pip install mplcyberpunk --user --quiet
+
+import warnings; warnings.filterwarnings('ignore')
+import mplcyberpunk,numpy as np
 import tensorflow as tf,pylab as pl
-import pandas as pd,numpy as np
-import tensorflow.keras.layers as tkl
-import tensorflow.keras.utils as tku
-import tensorflow.keras.callbacks as tkc
-import tensorflow_datasets as tfds
+from IPython.core.magic import register_line_magic
 from sklearn.metrics import \
 classification_report,confusion_matrix
-from IPython.core.magic import register_line_magic
+pl.style.use('cyberpunk')
 
-warnings.filterwarnings('ignore')
-pd.set_option('precision',3)
-tf.keras.backend.set_floatx('float64')
-tfds.disable_progress_bar()
-pl.style.use("cyberpunk")
-fpath='../input/image-examples-for-mixed-styles/'
-fn1,fn2='flower.png','cat.png'
-fw='weights.best.hdf5'
-buffer_size,batch_size=500,128
-pixels,pixels2=64,128
-num_classes=5
-
-def show2(img1,img2):
-    pl.subplot(1,2,1); pl.imshow(img1)
-    pl.subplot(1,2,2); pl.imshow(img2)
-    pl.show()
-def preprocess(item,img_size):
-    img,lbl=item['image'],item['label']
-    img_cropped=tf.image.central_crop(img,.95)
-    img_resized=tf.image.resize(
-        img_cropped,size=(img_size,img_size))
-    img_flip=tf.image\
-    .random_flip_left_right(img_resized)
-    return (img_flip/255.,tf.cast(lbl,tf.int32))
 @register_line_magic
 def display_examples(pars):
     pars=pars.split()
     data,n=pars[0],int(pars[1])
-    if data=='cats_vs_dogs': data=cvd_test
-    if data=='tf_flowers': data=flower_test
+    if data=='cats_vs_dogs':
+        global cvd_test; data=cvd_test
+    if data=='tf_flowers': 
+        global flower_test; data=flower_test
     batch=next(iter(data.batch(n)))
     images=batch[0].numpy()
     labels=batch[1].numpy() 
@@ -81,99 +61,121 @@ def display_examples(pars):
                 horizontalalignment='center',
                 verticalalignment='center', 
                 transform=ax.transAxes)
-    pl.show()
+    pl.tight_layout(); pl.show()
+    
 @register_line_magic
 def history_plot(yes):
     global history
     pl.figure(figsize=(10,10)); pl.subplot(211)
     keys=list(history.history.keys())[0:4]
     pl.plot(history.history[keys[0]],
-            color=c1,label='train')
+            color=c1,label=keys[0])
     pl.plot(history.history[keys[2]],
-            color=c2,label='valid')
-    pl.xlabel("Epochs"); pl.ylabel("Loss")
-    pl.legend(); pl.grid()
-    pl.title('Loss Function')     
+            color=c2,label=keys[2])
+    pl.xlabel('Epochs'); pl.ylabel('Loss')
+    pl.legend(); pl.grid(); pl.title('Loss Function')     
     pl.subplot(212)
     pl.plot(history.history[keys[1]],
-            color=c1,label='train')
+            color=c1,label=keys[1])
     pl.plot(history.history[keys[3]],
-            color=c2,label='valid')
-    pl.xlabel("Epochs"); pl.ylabel("Accuracy")    
-    pl.legend(); pl.grid()
-    pl.title('Accuracy')
-    mplcyberpunk.add_glow_effects(); pl.show()
-def cb(fw):
-    early_stopping=\
-    tkc.EarlyStopping(monitor='val_loss',
-                      patience=10,verbose=2)
-    checkpointer=\
-    tkc.ModelCheckpoint(filepath=fw,
-                        save_best_only=True,verbose=2)
-    lr_reduction=\
-    tkc.ReduceLROnPlateau(monitor='val_loss',verbose=2,
-                          patience=5,factor=.75)
-    return [checkpointer,early_stopping,
-            lr_reduction]
+            color=c2,label=keys[3])
+    pl.xlabel('Epochs'); pl.ylabel('Accuracy')    
+    pl.legend(); pl.grid(); pl.title('Accuracy')
+    mplcyberpunk.add_glow_effects()
+    pl.tight_layout(); pl.show()
+    
 @register_line_magic
 def display_reports(d):
-    global model,fw,buffer_size,c2,f2,fs2
-    model.load_weights(fw)
+    global model,model_weights,buffer_size
+    c2,f2,fs2='#6611ff','Orbitron',12
+    model.load_weights(model_weights)
     if d=='cats_vs_dogs': data=cvd_test
     if d=='tf_flowers': data=flower_test
-    test_results=model.evaluate(data.batch(buffer_size))
+    test_results=model.evaluate(
+        data.batch(buffer_size),verbose=0)
     dhtml('\ntest accuracy: {:.2f}%'\
-          .format(test_results[1]*100),
-          c2,f2,fs2)
+          .format(test_results[1]*100),c2,f2,fs2)
     batch=next(iter(data.batch(buffer_size)))
     y_test=batch[1].numpy()
     py_test=model.predict(data.batch(buffer_size))
     if d=='cats_vs_dogs':
-        py_test=tf.sigmoid(py_test)\
-                  .numpy().round()
+        py_test=tf.sigmoid(py_test).numpy().round()
     if d=='tf_flowers':
-        py_test=np.argmax(tf.nn.softmax(py_test)\
-                            .numpy(),axis=-1)
+        py_test=np.argmax(
+            tf.nn.softmax(py_test).numpy(),axis=-1)
     py_test=py_test[:buffer_size]
     dhtml('Classification Report',c2,f2,fs2)
     print(classification_report(y_test,py_test))
     dhtml('Confusion Matrix',c2,f2,fs2)
     print(confusion_matrix(y_test,py_test))
 
+# Commented out IPython magic to ensure Python compatibility.
+# %%writefile tfpreprocess_dataimage.py
+# import warnings; warnings.filterwarnings('ignore')
+# import mplcyberpunk,tensorflow as tf,pylab as pl
+# import pandas as pd,numpy as np
+# import tensorflow_datasets as tfds
+# from IPython.display import display
+# pd.set_option('precision',3)
+# tf.keras.backend.set_floatx('float64')
+# tfds.disable_progress_bar()
+# pl.style.use('cyberpunk')
+# 
+# def get2img(file_name1,file_name2,
+#             file_path='../input/image-examples-for-mixed-styles/'):
+#     imgtf1=tf.image.decode_image(
+#         tf.io.read_file(file_path+file_name1))
+#     imgtf2=tf.image.decode_image(
+#         tf.io.read_file(file_path+file_name2))
+#     display(pd.DataFrame(
+#     [[str(imgtf1.numpy().shape),str(imgtf2.numpy().shape)],
+#      [imgtf1.numpy().dtype,imgtf2.numpy().dtype],
+#      [tf.rank(imgtf1).numpy(),tf.rank(imgtf2).numpy()]],
+#      index=['shape','dtype','rank'],columns=['flower','cat']))
+#     return imgtf1,imgtf2
+# def show2img(imgtf1,imgtf2,fig_size):
+#     pl.figure(figsize=(2*fig_size,fig_size))
+#     pl.subplot(1,2,1); pl.imshow(imgtf1)
+#     pl.subplot(1,2,2); pl.imshow(imgtf2)
+#     pl.tight_layout(); pl.show()
+# def bcrop(img,box):
+#     return tf.image.crop_to_bounding_box(
+#         img,box[0],box[1],box[2],box[3])
+# def ccrop(img,c):
+#     return tf.image.central_crop(img,c)
+# def hflip(img):
+#     return tf.image.flip_left_right(img)
+# def vflip(img):
+#     return tf.image.flip_up_down(img)
+# def bright(img,d):
+#     return tf.image.adjust_brightness(img,delta=d)
+# @tf.function
+# def preprocess(item,img_size,crop=.95,contrast=1.1):
+#     img,lbl=item['image'],item['label']
+#     img_cropped=tf.image.central_crop(img,crop)
+#     img_contrast=tf.image.adjust_contrast(
+#         img_cropped,contrast)
+#     img_resized=tf.image.resize(
+#         img_contrast,size=(img_size,img_size))
+#     img_flip=tf.image\
+#     .random_flip_left_right(img_resized)
+#     return (img_flip/255.,tf.cast(lbl,tf.int32))
+
+# Commented out IPython magic to ensure Python compatibility.
+# %run tfpreprocess_dataimage.py
 dhtml('Image Structure')
 
-imgtf1=tf.image.decode_image(tf.io.read_file(fpath+fn1))
-imgtf2=tf.image.decode_image(tf.io.read_file(fpath+fn2))
-show2(imgtf1,imgtf2)
-pd.DataFrame([[str(imgtf1.numpy().shape),
-               str(imgtf2.numpy().shape)],
-              [imgtf1.numpy().dtype,
-               imgtf2.numpy().dtype],
-              [tf.rank(imgtf1).numpy(),
-               tf.rank(imgtf2).numpy()]],
-            index=['shape','dtype','rank'],
-            columns=['flower','cat'])
+file_name1,file_name2='flower.png','cat.png'
+imgtf1,imgtf2=get2img(file_name1,file_name2)
+show2img(imgtf1,imgtf2,5)
 
 dhtml('Image Processing')
 
-def bcrop(img,box):
-    return tf.image.crop_to_bounding_box(
-        img,box[0],box[1],box[2],box[3])
-def ccrop(img,c):
-    return tf.image.central_crop(img,c)
-show2(bcrop(imgtf1,[5,35,175,195]),
-      bcrop(imgtf2,[5,15,235,155]))
-show2(ccrop(imgtf1,.9),ccrop(imgtf2,.8))
-
-def hflip(img):
-    return tf.image.flip_left_right(img)
-def vflip(img):
-    return tf.image.flip_up_down(img)
-def bright(img,d):
-    return tf.image.adjust_brightness(
-        img,delta=d)
-show2(vflip(imgtf1),hflip(imgtf2))
-show2(bright(imgtf1,.2),bright(imgtf2,.4))
+show2img(bcrop(imgtf1,[5,35,175,195]),
+         bcrop(imgtf2,[5,15,235,155]),3)
+show2img(ccrop(imgtf1,.95),ccrop(imgtf2,.91),3)
+show2img(vflip(imgtf1),hflip(imgtf2),3)
+show2img(bright(imgtf1,.3),bright(imgtf2,.1),3)
 
 dhtml('Data Processing')
 
@@ -181,10 +183,15 @@ cvd=tfds.builder('cats_vs_dogs:4.0.0')
 cvd.download_and_prepare()
 split=['train[:80%]','train[80%:90%]','train[90%:]']
 ds=cvd.as_dataset(shuffle_files=False,split=split)
-cvd_train=ds[0].map(lambda x: preprocess(x,img_size=pixels))
-cvd_valid=ds[1].map(lambda x: preprocess(x,img_size=pixels))
-cvd_test=ds[2].map(lambda x: preprocess(x,img_size=pixels))
-ncvd_train=int(cvd.info.splits['train[:80%]'].num_examples)
+img_size=64; buffer_size,batch_size=500,128
+cvd_train=ds[0].map(
+    lambda x: preprocess(x,img_size=img_size))
+cvd_valid=ds[1].map(
+    lambda x: preprocess(x,img_size=img_size))
+cvd_test=ds[2].map(
+    lambda x: preprocess(x,img_size=img_size))
+ncvd_train=int(
+    cvd.info.splits['train[:80%]'].num_examples)
 dhtml(str(ncvd_train),c2,f2,fs2)
 
 # Commented out IPython magic to ensure Python compatibility.
@@ -201,10 +208,15 @@ flower=tfds.builder('tf_flowers')
 flower.download_and_prepare()
 split=['train[:80%]','train[80%:90%]','train[90%:]']
 ds=flower.as_dataset(shuffle_files=False,split=split)
-flower_train=ds[0].map(lambda x: preprocess(x,img_size=pixels2))
-flower_valid=ds[1].map(lambda x: preprocess(x,img_size=pixels2))
-flower_test=ds[2].map(lambda x: preprocess(x,img_size=pixels2))
-nflower_train=int(flower.info.splits['train[:80%]'].num_examples)
+img_size2=128
+flower_train=ds[0].map(
+    lambda x: preprocess(x,img_size=img_size2))
+flower_valid=ds[1].map(
+    lambda x: preprocess(x,img_size=img_size2))
+flower_test=ds[2].map(
+    lambda x: preprocess(x,img_size=img_size2))
+nflower_train=int(
+    flower.info.splits['train[:80%]'].num_examples)
 dhtml(str(nflower_train),c2,f2,fs2)
 
 # Commented out IPython magic to ensure Python compatibility.
@@ -217,42 +229,72 @@ flower_train=flower_train\
 flower_train=flower_train.batch(batch_size)
 flower_valid=flower_valid.batch(batch_size)
 
-dhtml('CNN Binary Classification')
+dhtml('CNN Model Building')
 
-def convb(model,f,ks,d):
+import warnings; warnings.filterwarnings('ignore')
+import tensorflow as tf,numpy as np
+import tensorflow.keras.layers as tkl
+import tensorflow.keras.utils as tku
+import tensorflow.keras.callbacks as tkc
+tf.keras.backend.set_floatx('float64')
+model_weights='/checkpoints'
+
+def convblock(model,f,ks,dr):
     model.add(tkl.Conv2D(
     filters=f,kernel_size=(ks,ks),
     strides=(1,1),padding='same'))
     model.add(tkl.LeakyReLU(alpha=.02))
     model.add(tkl.MaxPool2D(pool_size=(2,2)))
-    model.add(tkl.Dropout(d))
+    model.add(tkl.Dropout(dr))
 
-model=tf.keras.Sequential()
-model.add(tkl.Input((pixels,pixels,3),
-                    name='input'))
-convb(model,32,5,.2)
-convb(model,128,5,.2)
-convb(model,512,5,.2)
-model.compute_output_shape(
-    input_shape=(batch_size,pixels,pixels,3))
+def convblocks(img_size,conv,ks=5,dr=.2):
+    model=tf.keras.Sequential()
+    model.add(tkl.Input(
+        (img_size,img_size,3),name='input'))
+    for i in range(len(conv)):
+        convblock(model,conv[i],ks,dr)
+    return model
 
-model.add(tkl.GlobalAveragePooling2D())   
-model.add(tkl.Dense(2048))
-model.add(tkl.LeakyReLU(alpha=.02))
-model.add(tkl.Dropout(.5))
-model.add(tkl.Dense(1,activation=None))
-model.compute_output_shape(
-    input_shape=(batch_size,pixels,pixels,1))
+def complete_model(model,dense,num_classes,dr=.5):
+    model.add(tkl.GlobalAveragePooling2D())   
+    model.add(tkl.Dense(dense))
+    model.add(tkl.LeakyReLU(alpha=.02))
+    model.add(tkl.Dropout(dr))
+    model.add(tkl.Dense(num_classes,activation=None))
+    return model
+
+def compile_model(model,loss):
+    return model.compile(optimizer=tf.keras.optimizers.Adam(),
+                         loss=loss,metrics=['accuracy'])
+
+def cb(fw):
+    early_stopping=tkc.EarlyStopping(
+        monitor='val_loss',patience=10,verbose=2)
+    checkpointer=tkc.ModelCheckpoint(
+        filepath=fw,save_best_only=True,verbose=2,
+        save_weights_only=True,monitor='val_accuracy',mode='max')
+    lr_reduction=tkc.ReduceLROnPlateau(
+        monitor='val_loss',verbose=2,patience=7,factor=.8)
+    return [checkpointer,early_stopping,lr_reduction]
+
+dhtml('CNN Binary Classification')
+
+conv=[32,128,512]; num_classes=1
+model=convblocks(img_size,conv)
+dhtml('convblocks` outputs:  '+str(model.compute_output_shape(
+    input_shape=(batch_size,img_size,img_size,3))))
+model=complete_model(model,2048,num_classes)
+dhtml('complete model`s outputs:  '+str(model.compute_output_shape(
+    input_shape=(batch_size,img_size,img_size,3))))
+loss=tf.keras.losses.BinaryCrossentropy(from_logits=True)
+compile_model(model,loss)
 
 steps_per_epoch=np.ceil(ncvd_train/batch_size)
-model.compile(optimizer=tf.keras.optimizers.Adam(),
-              loss=tf.keras.losses\
-              .BinaryCrossentropy(from_logits=True),
-              metrics=['accuracy'])
-history=model.fit(cvd_train,epochs=50,shuffle=True, 
-                  validation_data=cvd_valid,
-                  callbacks=cb(fw),
-                  steps_per_epoch=steps_per_epoch)
+history=model.fit(
+    cvd_train,epochs=50,shuffle=True, 
+    validation_data=cvd_valid,
+    callbacks=cb(model_weights),
+    steps_per_epoch=steps_per_epoch)
 
 # Commented out IPython magic to ensure Python compatibility.
 # %history_plot yes
@@ -262,34 +304,23 @@ history=model.fit(cvd_train,epochs=50,shuffle=True,
 
 dhtml('CNN Classification')
 
-model=tf.keras.Sequential()
-model.add(tkl.Input((pixels2,pixels2,3),
-                    name='input'))
-convb(model,32,5,.2)
-convb(model,64,5,.2)
-convb(model,128,5,.2)
-convb(model,256,5,.2)
-convb(model,512,5,.2)
-model.compute_output_shape(
-    input_shape=(batch_size,pixels2,pixels2,3))
-
-model.add(tkl.GlobalAveragePooling2D())   
-model.add(tkl.Dense(4096))
-model.add(tkl.LeakyReLU(alpha=.02))
-model.add(tkl.Dropout(.5))
-model.add(tkl.Dense(num_classes,activation=None))
-model.compute_output_shape(
-    input_shape=(batch_size,pixels2,pixels2,3))
+conv2=[32,64,128,256,512]; num_classes2=5
+model=convblocks(img_size2,conv2)
+dhtml('convblocks` outputs:  '+str(model.compute_output_shape(
+    input_shape=(batch_size,img_size2,img_size2,3))))
+model=complete_model(model,4096,num_classes2)
+dhtml('complete model`s outputs:  '+str(model.compute_output_shape(
+    input_shape=(batch_size,img_size2,img_size2,3))))
+loss=tf.keras.losses\
+.SparseCategoricalCrossentropy(from_logits=True)
+compile_model(model,loss)
 
 steps_per_epoch=np.ceil(nflower_train/batch_size)
-model.compile(optimizer=tf.keras.optimizers.Adam(),
-              loss=tf.keras.losses\
-              .SparseCategoricalCrossentropy(from_logits=True),
-              metrics=['accuracy'])
-history=model.fit(flower_train,epochs=50,shuffle=True, 
-                  validation_data=flower_valid,
-                  callbacks=cb(fw),
-                  steps_per_epoch=steps_per_epoch)
+history=model.fit(
+    flower_train,epochs=50,shuffle=True, 
+    validation_data=flower_valid,
+    callbacks=cb(model_weights),
+    steps_per_epoch=steps_per_epoch)
 
 # Commented out IPython magic to ensure Python compatibility.
 # %history_plot yes
