@@ -9,21 +9,33 @@ Original file is located at
 Reading classics [Python Machine Learning 3rd Edition](https://github.com/rasbt/python-machine-learning-book-3rd-edition/blob/master/ch15/ch15_part1.ipynb)
 """
 
-# Commented out IPython magic to ensure Python compatibility.
 from IPython.display import display,HTML
+import random
 c1,c2,f1,f2,fs1,fs2=\
 '#11ff66','#6611ff','Lobster','Orbitron',30,10
-def dhtml(string,fontcolor=c1,font=f1,fontsize=fs1):
+def bhtml(string,font_color=c1,font_family=f1,font_size=fs1):
+    randi=random.randint(1,999999999)
     display(HTML("""<style>
-    @import 'https://fonts.googleapis.com/css?family="""\
-    +font+"""&effect=3d-float';</style>
-    <h1 class='font-effect-3d-float' 
-    style='font-family:"""+font+\
-    """; color:"""+fontcolor+\
-    """; font-size:"""+str(fontsize)+"""px;'>
-#     %s</h1>"""%string))
+    @import 'https://fonts.googleapis.com/css?family="""+\
+    font_family+"""';</style><h1 id='colored_font"""+str(randi)+\
+    """' style='text-shadow:3px 3px 3px #11dd33; font-family:"""+\
+    font_family+"""; color:"""+font_color+"""; font-size:"""+\
+    str(font_size)+"""px; text-align:center; """+\
+    """height:"""+str(1.5*font_size)+"""px'>%s</h1>"""%string+\
+    """<script>var idc=setInterval(function() {"""+\
+    """var iddoc=document.getElementById("""+\
+    """'colored_font"""+str(randi)+"""'); """+\
+    """var now=new Date().getTime(); """+\
+    """var sec=Math.floor((now%(1000*60))/1000); """+\
+    """var col='rgb(0,'+(255-Math.abs(245-8*sec))+','"""+\
+    """+(10+Math.abs(245-8*sec))+')'; """+\
+    """iddoc.style.background=col;},100);</"""+"""script>"""))
+def df_with_styling(arg,index):
+    return display(pd.DataFrame(arg,index)\
+        .style.background_gradient(cmap='GnBu',axis=1)\
+        .set_properties(**{'max-width':'50px','height':'50px'}))
 
-dhtml('Code Modules, Setting, & Functions')
+bhtml('Code Modules, Setting, & Functions')
 
 import warnings; warnings.filterwarnings('ignore')
 import tensorflow as tf,pylab as pl
@@ -35,15 +47,13 @@ import tensorflow.keras.utils as tku
 from IPython.core.magic import register_line_magic
 pd.set_option('precision',3)
 
-dhtml('Conv1d Exploration')
+bhtml('Conv1d Exploration')
 
 num_w,num_x=4,7 #num_w>3!
 w=np.random.random(num_w)
 x=np.random.random(num_x)
 w_rotated=np.array(w[::-1])
-pd.DataFrame([w,w_rotated],
-             index=['w','w_rotated'])\
-.style.background_gradient(cmap='cool',axis=1)
+df_with_styling([w,w_rotated],index=['w','w_rotated'])
 
 def conv_step(x,i):
     y=np.dot(x[i:i+len(w)],w_rotated)
@@ -51,7 +61,7 @@ def conv_step(x,i):
         pd.DataFrame([x,i*[np.nan]+list(w_rotated),
                       i*[np.nan]+[y]],
                      index=['x','w_rotated','y'])\
-        .style.bar(align='mid',color=c2,
+        .style.bar(align='mid',color=c1,
                    subset=list(range(i,i+len(w))))\
         .set_properties(**{'max-width':'50px'}))  
 for i in range(len(x)-len(w)+1): conv_step(x,i)
@@ -64,27 +74,21 @@ def conv1d(x,w,p,s):
     if p>0:
         zero_pad=np.zeros(shape=p)
         x_padded=np.concatenate([zero_pad,x_padded,zero_pad])
-    dhtml('x: <br/>'+str(x)+\
-          '<br/>padded x: </br>'+str(x_padded)+\
-          '<br/>w: <br/>'+str(w)+\
-          '<br/>rotated w: <br/>'+str(w_rotated),
-          c2,f2,fs2)
+    df_with_styling([x,x_padded,w,w_rotated],
+                    index=['x','padded x','w','rotated w'])
     result=[]; steps=int((x_length-w_length)/s)+w_length%2
     for i in range(0,steps,s):
         result.append(np.sum(x_padded[i:i+w_length]*w_rotated))
     return np.array(result)
-pd.DataFrame([conv1d(x,w,p=2,s=1),
-             np.convolve(x,w,mode='same')],
-             index=['conv1d','numpy convolve'])\
-.style.background_gradient(cmap='cool',axis=1)\
-.set_properties(**{'max-width':'50px'})
+df_with_styling([conv1d(x,w,p=2,s=1),
+                 np.convolve(x,w,mode='same')],
+                index=['conv1d','numpy convolve'])
 
-pd.DataFrame([x,w]+[np.convolve(x,w,mode=m) 
-              for m in ['full','same','valid']])\
-.style.background_gradient(cmap='cool',axis=1)\
-.set_properties(**{'max-width':'50px'})
+df_with_styling([x,w]+[np.convolve(x,w,mode=m) 
+                for m in ['full','same','valid']],
+                index=range(5))
 
-dhtml('Conv2d Exploration')
+bhtml('Conv2d Exploration')
 
 num_X=6; p=[1,1]
 X=np.random.random([num_X,num_X])
@@ -93,28 +97,19 @@ n2=X.shape[1]+2*p[1]
 X_padded=np.zeros(shape=(n1,n2))
 X_padded[p[0]:p[0]+X.shape[0],
          p[1]:p[1]+X.shape[1]]=X
-pd.DataFrame(X_padded)\
-.style.background_gradient(cmap='cool',axis=1)\
-.set_properties(**{'max-width':'50px',
-                   'height':'50px'})
+df_with_styling(X_padded,index=range(num_X+2))
 
 num_W=3
 W=np.random.random([num_W,num_W])
 W_rotated=np.array(W)[::-1,::-1]
 for m in [W,W_rotated]:
-    display(pd.DataFrame(m)\
-    .style.background_gradient(cmap='cool',axis=1)\
-    .set_properties(**{'max-width':'50px',
-                       'height':'50px'}))
+    df_with_styling(m,index=range(num_W))
 
 X0=X_padded[:num_W,:num_W]
 Y0=round(np.sum(X0*W_rotated),9)
 for m in [X0,W_rotated]:
-    display(pd.DataFrame(m)\
-    .style.background_gradient(cmap='cool',axis=1)\
-    .set_properties(**{'max-width':'50px',
-                    'height':'50px'}))
-dhtml(7*'&#x21e3;'+'<br/>'+str(Y0))
+    df_with_styling(m,index=range(num_W))
+bhtml(7*'&#x21e3;'); bhtml(str(Y0))
 
 def conv2d(X,W,p,s):
     W_rotated=np.array(W)[::-1,::-1]
@@ -136,91 +131,95 @@ def conv2d(X,W,p,s):
 
 for el in [conv2d(X,W,p=(1,1),s=(1,1)),
            sps.convolve2d(X,W,mode='same')]:
-    display(pd.DataFrame(el)\
-            .style.background_gradient(cmap='cool',axis=1)\
-            .set_properties(**{'max-width':'50px'}))
+    df_with_styling(el,index=range(6))
 
-dhtml('Pooling Exploration')
+bhtml('Pooling Exploration')
 
 pool_size=3
 for [i,j] in [[0,0],[0,1],[1,0],[1,1]]:
-    display(pd.DataFrame(X[i*pool_size:(i+1)*pool_size,
-                           j*pool_size:(j+1)*pool_size])\
-            .style.highlight_max(color=c2,axis=None)\
-            .set_properties(**{'max-width':'50px',
-                               'height':'50px'}))
+    display(pd.DataFrame(
+        X[i*pool_size:(i+1)*pool_size,
+          j*pool_size:(j+1)*pool_size])\
+        .style.highlight_max(color=c1,axis=None)\
+        .set_properties(
+            **{'max-width':'50px','height':'50px'}))
 
 maxp=sim.block_reduce(X,(pool_size,pool_size),np.max)
-pd.DataFrame(maxp)\
-.style.bar(align='mid',color=c2)\
-.set_properties(**{'max-width':'50px'})
+pd.DataFrame(maxp).style.bar(align='mid',color=c1)\
+.set_properties(**{'max-width':'50px','height':'50px'})
 
 meanp=sim.block_reduce(X,(pool_size,pool_size),np.mean)
-pd.DataFrame(meanp)\
-.style.bar(align='mid',color=c2)\
-.set_properties(**{'max-width':'50px'})
+pd.DataFrame(meanp).style.bar(align='mid',color=c1)\
+.set_properties(**{'max-width':'50px','height':'50px'})
 
-dhtml('Keras Conv1D/MaxPool1D & Conv2D/MaxPool2D')
-
-@register_line_magic
-def get_model_plot1d(pars):
-    pars=pars.split()
-    num_timesteps=int(pars[0])
-    num_features=int(pars[1])
-    num_filters=int(pars[2])
-    ks=int(pars[3])
-    ps=int(pars[4])
-    model=tf.keras.Sequential()
-    model.add(tkl.InputLayer((num_timesteps,
-                              num_features),
-                             name='input'))
-    model.add(tkl.Conv1D(
-        filters=num_filters,
-        kernel_size=ks,
-        padding='same',name='conv1d',
-        activation='relu'))
-    model.add(tkl.MaxPool1D(
-        pool_size=ps,name='pool1d'))
-    display(tku.plot_model(model,show_shapes=True))
+bhtml('Keras Conv1D/MaxPool1D & Conv2D/MaxPool2D')
 
 # Commented out IPython magic to ensure Python compatibility.
-# %get_model_plot1d 4 16 32 3 2
+# %%writefile keras_model_plot12d.py
+# import warnings; warnings.filterwarnings('ignore')
+# import tensorflow as tf
+# import tensorflow.keras.layers as tkl
+# import tensorflow.keras.utils as tku
+# from IPython.core.magic import register_line_magic
+# from IPython.display import display
+# 
+# @register_line_magic
+# def get_model_plot1d(pars):
+#     pars=pars.split()
+#     num_timesteps=int(pars[0])
+#     num_features=int(pars[1])
+#     num_filters=int(pars[2])
+#     ks=int(pars[3])
+#     ps=int(pars[4])
+#     model=tf.keras.Sequential()
+#     model.add(tkl.InputLayer((num_timesteps,
+#                               num_features),
+#                              name='input'))
+#     model.add(tkl.Conv1D(
+#         filters=num_filters,
+#         kernel_size=ks,
+#         padding='same',name='conv1d',
+#         activation='relu'))
+#     model.add(tkl.MaxPool1D(
+#         pool_size=ps,name='pool1d'))
+#     display(tku.plot_model(model,show_shapes=True))
+# 
+# @register_line_magic
+# def get_model_plot2d(pars):
+#     pars=pars.split()
+#     img_size=int(pars[0])
+#     num_channels=int(pars[1])
+#     num_filters=int(pars[2])
+#     ks=int(pars[3])
+#     ps=int(pars[4])
+#     model=tf.keras.Sequential()
+#     model.add(tkl.InputLayer((img_size,img_size,
+#                               num_channels),
+#                              name='input'))
+#     model.add(tkl.Conv2D(
+#         filters=num_filters,
+#         kernel_size=(ks,ks),strides=(1,1),
+#         padding='same',name='conv2d',
+#         activation='relu'))
+#     model.add(tkl.MaxPool2D(
+#         pool_size=(ps,ps),name='pool2d'))
+#     display(tku.plot_model(model,show_shapes=True))
 
-@register_line_magic
-def get_model_plot2d(pars):
-    pars=pars.split()
-    img_size=int(pars[0])
-    num_channels=int(pars[1])
-    num_filters=int(pars[2])
-    ks=int(pars[3])
-    ps=int(pars[4])
-    model=tf.keras.Sequential()
-    model.add(tkl.InputLayer((img_size,img_size,
-                              num_channels),
-                             name='input'))
-    model.add(tkl.Conv2D(
-        filters=num_filters,
-        kernel_size=(ks,ks),strides=(1,1),
-        padding='same',name='conv2d',
-        activation='relu'))
-    model.add(tkl.MaxPool2D(
-        pool_size=(ps,ps),name='pool2d'))
-    display(tku.plot_model(model,show_shapes=True))
+# Commented out IPython magic to ensure Python compatibility.
+# %run keras_model_plot12d.py
+# %get_model_plot1d 4 16 32 3 2
 
 # Commented out IPython magic to ensure Python compatibility.
 # %get_model_plot2d 32 3 64 5 4
 
-dhtml('Keras Dropout')
+bhtml('Keras Dropout')
 
-num_Y=100; dr=[.2*i for i in range(1,4)]
+num_Y=100; dr=[.2*i for i in range(4)]
 Y=np.random.random(num_Y)
-pl.figure(figsize=(7,2))
-pl.scatter(range(num_Y),Y,c=c2)
-pl.title('input'); pl.grid(); pl.show()
-for i in range(3):
+for i in range(4):
     pl.figure(figsize=(7,2))
     pl.scatter(range(num_Y),
                tkl.Dropout(rate=dr[i])\
-               (Y,training=True),c=c2)
+               (Y,training=True),c=c1)
     pl.title('dropout rate: '+str(dr[i]))
-    pl.grid(); pl.show()
+    pl.grid(); pl.tight_layout(); pl.show()
