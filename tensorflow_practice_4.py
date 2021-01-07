@@ -176,7 +176,7 @@ phtml('batch values of `ModelYear`: </br>%s'%\
 # %cmap_header TF Regressor
 
 reg=tf.estimator.DNNRegressor(
-    feature_columns=features,hidden_units=[32,16],
+    feature_columns=features,hidden_units=[64,32,16,8],
     model_dir='models/autompg-dnnregressor/');
 
 epochs=1000
@@ -187,7 +187,7 @@ reg.train(input_fn=lambda:\
           batch_size),steps=steps);
 
 reloaded_reg=tf.estimator.DNNRegressor(
-    feature_columns=features,hidden_units=[32,16],
+    feature_columns=features,hidden_units=[64,32,16,8],
     warm_start_from='models/autompg-dnnregressor/',
     model_dir='models/autompg-dnnregressor/');
 
