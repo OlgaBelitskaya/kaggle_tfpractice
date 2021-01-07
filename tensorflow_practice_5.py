@@ -33,7 +33,7 @@ Reading classics [Python Machine Learning 3rd Edition](https://github.com/rasbt/
 #     var tc=setInterval(function(){
 #         var now=new Date().getTime();
 #         var iddoc1=document.getElementById('colorized1');
-#         iddoc1.style.color=d3.interpolateSinebow(now/20000); },1)
+#         iddoc1.style.color=d3.interpolateRainbow(now/20000); },1)
 #     </script>"""
 #     file='d3header'+randi+'.html'
 #     with open(file,'w') as f:
@@ -132,7 +132,7 @@ pl.title(by_test[n],fontdict={'fontsize':'xx-large'});
 # %left_header DNN Classifiers|22|Orbitron
 
 dnn_clf=tf.estimator.DNNClassifier(
-    feature_columns=[feature_column],hidden_units=[96,32],
+    feature_columns=[feature_column],hidden_units=[512,196,32],
     n_classes=10,model_dir='models/mnist-dnn/');
 
 #train without validation
