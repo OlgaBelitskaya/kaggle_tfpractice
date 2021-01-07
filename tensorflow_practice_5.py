@@ -10,7 +10,7 @@ Reading classics [Python Machine Learning 3rd Edition](https://github.com/rasbt/
 """
 
 # Commented out IPython magic to ensure Python compatibility.
-# %%writefile color_header.py
+# %%writefile color_left_header.py
 # from IPython.display import display,HTML
 # from IPython.core.magic import register_line_magic
 # import random
@@ -45,7 +45,7 @@ Reading classics [Python Machine Learning 3rd Edition](https://github.com/rasbt/
 #     display(HTML(string))
 
 # Commented out IPython magic to ensure Python compatibility.
-# %run color_header.py
+# %run color_left_header.py
 # %left_header Code Modules & Functions|22|Orbitron
 
 import warnings; warnings.filterwarnings('ignore')
@@ -109,7 +109,7 @@ def display_predict(n):
 # Commented out IPython magic to ensure Python compatibility.
 # %left_header Data Processing|22|Orbitron
 
-buffer_size=1000; batch_size=64
+buffer_size=1000; batch_size=16
 img_size=28; num_epochs=20
 steps_per_epoch=np.ceil(.9*60000/batch_size)
 feature_column=tf.feature_column.numeric_column(
@@ -132,7 +132,7 @@ pl.title(by_test[n],fontdict={'fontsize':'xx-large'});
 # %left_header DNN Classifiers|22|Orbitron
 
 dnn_clf=tf.estimator.DNNClassifier(
-    feature_columns=[feature_column],hidden_units=[512,196,32],
+    feature_columns=[feature_column],hidden_units=[1024,196,32],
     n_classes=10,model_dir='models/mnist-dnn/');
 
 #train without validation
