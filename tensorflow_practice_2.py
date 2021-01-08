@@ -24,7 +24,8 @@ Original file is located at
 #         cmap='Sinebow'
 #     else: 
 #         font_size=params[1]; font_family=params[2]; cmap=params[3]
-#     height=int(font_size)*3; randi=str(random.uniform(0,9999999))
+#     height=max([int(font_size)*2.5,60]) 
+#     randi=str(random.uniform(0,9999999))
 #     html_str="""
 # <script src='https://d3js.org/d3.v6.min.js'></script>
 # <style>
@@ -38,18 +39,19 @@ Original file is located at
 # <canvas id='canvas002'></canvas></text><br/>
 # <script>
 # var tc=setInterval(function() {
-#     var now=new Date().getTime();
+#     var now=(new Date().getTime()%5000)/5000;
+#     var now_slow=(new Date().getTime()%100000)/100000;
 #     var iddoc=document.getElementById('colorized001');
-#     iddoc.style.color=d3.interpolate"""+cmap+"""(now/6000);
+#     iddoc.style.color=d3.interpolate"""+cmap+"""(now);
 #     var r=10,n=7;
 #     var c1=document.getElementById('canvas001'); 
 #     var context1=c1.getContext('2d');
 #     var c2=document.getElementById('canvas002'); 
 #     var context2=c2.getContext('2d');
-#     c1.style.background=d3.interpolate"""+cmap+"""(now/60000); 
-#     c2.style.background=d3.interpolate"""+cmap+"""(now/60000);
-#     context1.strokeStyle=d3.interpolate"""+cmap+"""(now/6000);    
-#     context2.strokeStyle=d3.interpolate"""+cmap+"""(now/6000);
+#     c1.style.background=d3.interpolate"""+cmap+"""(now_slow); 
+#     c2.style.background=d3.interpolate"""+cmap+"""(now_slow);
+#     context1.strokeStyle=d3.interpolate"""+cmap+"""(now);    
+#     context2.strokeStyle=d3.interpolate"""+cmap+"""(now);
 #     for (var i=1; i<n; i++) {
 #         context1.beginPath(); context2.beginPath();
 #         for (var j=0; j<6; j++) {
@@ -77,7 +79,7 @@ Original file is located at
 # <style>
 # @import url('https://fonts.googleapis.com/css?family=Ewert|Roboto&effect=3d');
 # span {text-shadow:3px 3px 3px #aaa;}  
-# div.output_area pre{font-family:Roboto; font-size:110%; color:#ff36ff;}      
+# div.output_area pre{font-family:Roboto; font-size:110%; color:#36ff36;}      
 # </style>
 
 import warnings; warnings.filterwarnings('ignore')
@@ -88,22 +90,17 @@ from sklearn.model_selection import train_test_split
 fpath3='../input/classification-of-handwritten-letters/'
 fpath4='../input/flower-color-images/'
 
-def prepro(x_train,y_train,x_test,y_test,n_class):
+def prepro(x_train,y_train,x_test,y_test):
     n=int(len(x_test)/2)    
     x_valid,y_valid=x_test[:n],y_test[:n]
     x_test,y_test=x_test[n:],y_test[n:]
-    cy_train=tf.keras.utils.to_categorical(y_train,n_class) 
-    cy_valid=tf.keras.utils.to_categorical(y_valid,n_class)
-    cy_test=tf.keras.utils.to_categorical(y_test,n_class)
     df=pd.DataFrame([[x_train.shape,x_valid.shape,x_test.shape],
-                     [y_train.shape,y_valid.shape,y_test.shape],
-                     [cy_train.shape,cy_valid.shape,cy_test.shape]],
+                     [y_train.shape,y_valid.shape,y_test.shape]],
                     columns=['train','valid','test'],
-                    index=['images','labels','encoded labels'])
+                    index=['image arrays','label arrays'])
     display(df)
     return [[x_train,x_valid,x_test],
-            [y_train,y_valid,y_test],
-            [cy_train,cy_valid,cy_test]]
+            [y_train,y_valid,y_test]]
 
 # Commented out IPython magic to ensure Python compatibility.
 # %decor_header Data Loading & Preprocessing
@@ -111,41 +108,37 @@ def prepro(x_train,y_train,x_test,y_test,n_class):
 (x_train1,y_train1),(x_test1,y_test1)=\
 tf.keras.datasets.mnist.load_data()
 [[x_train1,x_valid1,x_test1],
- [y_train1,y_valid1,y_test1],
- [cy_train1,cy_valid1,cy_test1]]=\
+ [y_train1,y_valid1,y_test1]]=\
 prepro(x_train1/255,y_train1.reshape(-1,1),
-       x_test1/255,y_test1.reshape(-1,1),10)
+       x_test1/255,y_test1.reshape(-1,1))
 
 (x_train2,y_train2),(x_test2,y_test2)=\
 tf.keras.datasets.cifar10.load_data()
 [[x_train2,x_valid2,x_test2],
- [y_train2,y_valid2,y_test2],
- [cy_train2,cy_valid2,cy_test2]]=\
-prepro(x_train2/255,y_train2,x_test2/255,y_test2,10)
+ [y_train2,y_valid2,y_test2]]=\
+prepro(x_train2/255,y_train2,x_test2/255,y_test2)
 
 f=h5py.File(fpath3+'LetterColorImages_123.h5','r') 
-keys=list(f.keys()); keys
-images=np.array(f[keys[1]])/255
-labels=np.array(f[keys[2]]).astype('int').reshape(-1,1)-1
+keys=list(f.keys()); print(keys)
+images=np.array(f[keys[1]]).astype('float32')/255
+labels=np.array(f[keys[2]]).astype('int32').reshape(-1,1)-1
 x_train3,x_test3,y_train3,y_test3=\
 train_test_split(images,labels,test_size=.2,random_state=1)
 del images,labels
 [[x_train3,x_valid3,x_test3],
- [y_train3,y_valid3,y_test3],
- [cy_train3,cy_valid3,cy_test3]]=\
-prepro(x_train3,y_train3,x_test3,y_test3,33)
+ [y_train3,y_valid3,y_test3]]=\
+prepro(x_train3,y_train3,x_test3,y_test3)
 
 f=h5py.File(fpath4+'FlowerColorImages.h5','r') 
-keys=list(f.keys()); keys
-images=np.array(f[keys[0]])/255
-labels=np.array(f[keys[1]]).astype('int').reshape(-1,1)
+keys=list(f.keys()); print(keys)
+images=np.array(f[keys[0]]).astype('float32')/255
+labels=np.array(f[keys[1]]).astype('int32').reshape(-1,1)
 x_train4,x_test4,y_train4,y_test4=\
 train_test_split(images,labels,test_size=.2,random_state=1)
 del images,labels
 [[x_train4,x_valid4,x_test4],
- [y_train4,y_valid4,y_test4],
- [cy_train4,cy_valid4,cy_test4]]=\
-prepro(x_train4,y_train4,x_test4,y_test4,10)
+ [y_train4,y_valid4,y_test4]]=\
+prepro(x_train4,y_train4,x_test4,y_test4)
 
 # Commented out IPython magic to ensure Python compatibility.
 # %decor_header Models with Adversarial Regularization
