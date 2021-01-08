@@ -8,245 +8,257 @@ Original file is located at
 """
 
 # Commented out IPython magic to ensure Python compatibility.
-from IPython.display import display,HTML
-def dhtml(str):
-    display(HTML("""<style>
-    @import url('https://fonts.googleapis.com/css?family=Ewert&effect=3d');      
-    </style><h1 class='font-effect-3d' style='font-family:Ewert; color:#ff355e'>
-#     %s</h1>"""%str))
-dhtml('Code Modules & Helpful Functions')
+# %%writefile radial_gradient_header.py
+# import random; from IPython.display import display,HTML
+# from IPython.core.magic import register_line_magic
+# @register_line_magic
+# def radial_gradient_header(params):
+#     randi=str(random.randint(1,9999999))
+#     params=params.split('|'); string=params[0]
+#     if len(params)==1: 
+#         font_size=str(30); font_family='Ewert'
+#     elif len(params)==2: 
+#         font_size=params[1]; font_family='Ewert'
+#     else:
+#         font_size=params[1]; font_family=params[2]
+#     html_str="""<style>@import 'https://fonts.googleapis.com/css?"""+\
+#     """family="""+font_family+"""'; #div"""+randi+\
+#     """ {background:white; padding:2px;}
+#     .textrg {display:inline-block; font-size:"""+font_size+\
+#     """px; line-height:1.1; padding:5px; font-family:"""+font_family+\
+#     """,sans-serif; text-transform:uppercase;
+#        background:radial-gradient(
+#            circle farthest-corner at center center,
+#            orange,magenta,cyan) no-repeat;
+#        -webkit-background-clip:text;
+#        -webkit-text-fill-color:transparent;}</style>
+#     <div id='div"""+randi+"""'><text class='textrg'>"""+string+\
+#     """</text></div>"""
+#     display(HTML(html_str))
 
-"""[Google Colaboratory Version](https://colab.research.google.com/drive/1UXD9nxTS9s2EGkiRst59NREqX9Eiw3Zp)"""
+"""[📑 Google Colaboratory Version](https://colab.research.google.com/drive/1UXD9nxTS9s2EGkiRst59NREqX9Eiw3Zp)"""
+
+# Commented out IPython magic to ensure Python compatibility.
+# %run radial_gradient_header.py
+# %radial_gradient_header Code Modules & Functions
 
 import numpy as np,pylab as pl,pandas as pd
-import h5py,tensorflow as tf
-import tensorflow_hub as th
+import h5py,tensorflow as tf,tensorflow_hub as th
+from IPython.display import display
 from sklearn.model_selection import train_test_split
-
 fpath1='../input/traditional-decor-patterns/'
-fpath3='../input/classification-of-handwritten-letters/'
-fpath4='../input/flower-color-images/'
-fw='weights.best.hdf5'
-def prepro(x_train,y_train,x_test,y_test,n_class):
+fpath2='../input/classification-of-handwritten-letters/'
+fpath3='../input/flower-color-images/'
+model_weights='/checkpoints'
+
+def prepro(images,labels):
+    x_train,x_test,y_train,y_test=train_test_split(
+        images,labels,test_size=.2,random_state=1)
     n=int(len(x_test)/2)    
     x_valid,y_valid=x_test[:n],y_test[:n]
     x_test,y_test=x_test[n:],y_test[n:]
-    cy_train=tf.keras.utils.to_categorical(y_train,n_class) 
-    cy_valid=tf.keras.utils.to_categorical(y_valid,n_class)
-    cy_test=tf.keras.utils.to_categorical(y_test,n_class)
     df=pd.DataFrame([[x_train.shape,x_valid.shape,x_test.shape],
-                     [y_train.shape,y_valid.shape,y_test.shape],
-                     [cy_train.shape,cy_valid.shape,cy_test.shape]],
+                     [y_train.shape,y_valid.shape,y_test.shape]],
                     columns=['train','valid','test'],
-                    index=['images','labels','encoded labels'])
+                    index=['images','labels'])
     display(df)
     return [[x_train,x_valid,x_test],
-            [y_train,y_valid,y_test],
-            [cy_train,cy_valid,cy_test]]
-def cb(fw):
-    early_stopping=tf.keras.callbacks\
-    .EarlyStopping(monitor='val_loss',patience=20,verbose=2)
-    checkpointer=tf.keras.callbacks\
-    .ModelCheckpoint(filepath=fw,save_best_only=True,verbose=2)
-    lr_reduction=tf.keras.callbacks\
-    .ReduceLROnPlateau(monitor='val_loss',verbose=2,
-                       patience=5,factor=.8)
-    return [checkpointer,early_stopping,lr_reduction]
-def display_resize(x_train,x_valid,x_test,
-                   y_valid,cy_valid,pixels):
-    x_train=tf.image.resize(x_train,[pixels,pixels])
-    x_valid=tf.image.resize(x_valid,[pixels,pixels])
-    x_test=tf.image.resize(x_test,[pixels,pixels])
+            [y_train,y_valid,y_test]]
+def display_resize(x_train,x_valid,x_test,y_valid,img_size):
+    x_train=tf.image.resize(x_train,[img_size,img_size])
+    x_valid=tf.image.resize(x_valid,[img_size,img_size])
+    x_test=tf.image.resize(x_test,[img_size,img_size])
     img=x_valid[1]
     lbl='one example of resized images \nlabel: '+\
-     str(y_valid[1][0])+'=>'+str(cy_valid[1])+\
-     '\nshape: '+str(img.shape)
-    pl.imshow(img); pl.title(lbl)
+     str(y_valid[1][0])+'\nshape: '+str(img.shape)
+    pl.imshow(img); pl.tight_layout()
+    pl.title(lbl); pl.show();
     return [x_train,x_valid,x_test]
-def premodel(pix,den,mh,lbl):
+def premodel(img_size,dense,model_handle,num_classes):
     model=tf.keras.Sequential([
-        tf.keras.layers.Input((pix,pix,3),
-                              name='input'),
-        th.KerasLayer(mh,trainable=True),
+        tf.keras.layers.Input((img_size,img_size,3),name='input'),
+        th.KerasLayer(model_handle,trainable=True),
         tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(den,activation='relu'),
+        tf.keras.layers.Dense(dense),
+        tf.keras.layers.LeakyReLU(alpha=.02),
         tf.keras.layers.Dropout(rate=.5),
-        tf.keras.layers.Dense(lbl,activation='softmax')])
+        tf.keras.layers.Dense(num_classes,activation='softmax')])
     model.compile(optimizer='adam',metrics=['accuracy'],
-                  loss='categorical_crossentropy')
+                  loss='sparse_categorical_crossentropy')
     display(model.summary())
     return model
+def cb(mw):
+    early_stopping=tf.keras.callbacks.EarlyStopping(
+        monitor='val_loss',patience=20,verbose=2)
+    checkpointer=tf.keras.callbacks.ModelCheckpoint(
+        filepath=mw,save_best_only=True,save_weights_only=True,
+        verbose=2,monitor='val_accuracy',mode='max')
+    lr_reduction=tf.keras.callbacks.ReduceLROnPlateau(
+        monitor='val_loss',verbose=2,patience=5,factor=.8)
+    return [checkpointer,early_stopping,lr_reduction]
 
-dhtml('Data Loading & Preprocessing <br/> #1')
+# Commented out IPython magic to ensure Python compatibility.
+# %radial_gradient_header Data Loading & Preprocessing <br/> Set #1
 f=h5py.File(fpath1+'DecorColorImages.h5','r') 
 keys=list(f.keys()); print(keys)
-images=np.array(f[keys[2]])/255
-labels=np.array(f[keys[1]]).astype('int').reshape(-1,1)-1
-x_train1,x_test1,y_train1,y_test1=\
-train_test_split(images,labels,test_size=.2,random_state=1)
-del images,labels
+images=np.array(f[keys[2]]).astype('float32')/255
+labels=np.array(f[keys[1]]).astype('int32').reshape(-1,1)-1
 [[x_train1,x_valid1,x_test1],
- [y_train1,y_valid1,y_test1],
- [cy_train1,cy_valid1,cy_test1]]=\
-prepro(x_train1,y_train1,x_test1,y_test1,7)
+ [y_train1,y_valid1,y_test1]]=prepro(images,labels)
+del images,labels
 
-dhtml('#2')
-(x_train2,y_train2),(x_test2,y_test2)=\
-tf.keras.datasets.cifar10.load_data()
+# Commented out IPython magic to ensure Python compatibility.
+# %radial_gradient_header Set #2
+f=h5py.File(fpath2+'LetterColorImages_123.h5','r') 
+keys=list(f.keys()); print(keys)
+images=np.array(f[keys[1]]).astype('float32')/255
+labels=np.array(f[keys[2]]).astype('int32').reshape(-1,1)-1
 [[x_train2,x_valid2,x_test2],
- [y_train2,y_valid2,y_test2],
- [cy_train2,cy_valid2,cy_test2]]=\
-prepro(x_train2/255,y_train2,x_test2/255,y_test2,10)
-
-dhtml('#3')
-f=h5py.File(fpath3+'LetterColorImages_123.h5','r') 
-keys=list(f.keys()); print(keys)
-images=np.array(f[keys[1]])/255
-labels=np.array(f[keys[2]]).astype('int').reshape(-1,1)-1
-x_train3,x_test3,y_train3,y_test3=\
-train_test_split(images,labels,test_size=.2,random_state=1)
+ [y_train2,y_valid2,y_test2]]=prepro(images,labels)
 del images,labels
+
+# Commented out IPython magic to ensure Python compatibility.
+# %radial_gradient_header Set #3
+f=h5py.File(fpath3+'FlowerColorImages.h5','r') 
+keys=list(f.keys()); print(keys)
+images=np.array(f[keys[0]]).astype('float32')/255
+labels=np.array(f[keys[1]]).astype('int32').reshape(-1,1)
 [[x_train3,x_valid3,x_test3],
- [y_train3,y_valid3,y_test3],
- [cy_train3,cy_valid3,cy_test3]]=\
-prepro(x_train3,y_train3,x_test3,y_test3,33)
-
-dhtml('#4')
-f=h5py.File(fpath4+'FlowerColorImages.h5','r') 
-keys=list(f.keys()); print(keys)
-images=np.array(f[keys[0]])/255
-labels=np.array(f[keys[1]]).astype('int').reshape(-1,1)
-x_train4,x_test4,y_train4,y_test4=\
-train_test_split(images,labels,test_size=.2,random_state=1)
+ [y_train3,y_valid3,y_test3]]=prepro(images,labels)
 del images,labels
-[[x_train4,x_valid4,x_test4],
- [y_train4,y_valid4,y_test4],
- [cy_train4,cy_valid4,cy_test4]]=\
-prepro(x_train4,y_train4,x_test4,y_test4,10)
 
-dhtml('Pre-Trained Saved Models')
-dhtml('#1')
-[handle_base,pixels]=["mobilenet_v2_100_192",192]
-mhandle="https://tfhub.dev/google/imagenet/{}/feature_vector/4"\
-.format(handle_base)
+# Commented out IPython magic to ensure Python compatibility.
+# %radial_gradient_header Set #4
+(x_train4,y_train4),(x_test4,y_test4)=\
+tf.keras.datasets.cifar10.load_data()
+x_train4,x_test4=x_train4/255,x_test4/255
+x_valid4,x_test4,y_valid4,y_test4=train_test_split(
+    x_test4,y_test4,test_size=.5,random_state=1)
+df=pd.DataFrame([[x_train4.shape,x_valid4.shape,x_test4.shape],
+                 [y_train4.shape,y_valid4.shape,y_test4.shape]],
+                columns=['train','valid','test'],
+                index=['images','labels'])
+display(df)
 
-[x_train1,x_valid1,x_test1]=\
-display_resize(x_train1,x_valid1,x_test1,
-               y_valid1,cy_valid1,pixels)
+# Commented out IPython magic to ensure Python compatibility.
+# %radial_gradient_header Pre-Trained Saved Models <br/> Set #1
+[handle_base,img_size]=['mobilenet_v2_100_192',192]
+model_handle='https://tfhub.dev/google/imagenet/'+\
+             '{}/feature_vector/4'.format(handle_base)
 
-model=premodel(pixels,1024,mhandle,7)
+model=premodel(img_size,1024,model_handle,7)
 
-history=model.fit(x=x_train1,y=cy_train1,batch_size=16,
-                  epochs=50,callbacks=cb(fw),
-                  validation_data=(x_valid1,cy_valid1))
+[x_train1,x_valid1,x_test1]=display_resize(
+    x_train1,x_valid1,x_test1,y_valid1,img_size)
 
-model.load_weights(fw)
-model.evaluate(x_test1,cy_test1)
+history=model.fit(x=x_train1,y=y_train1,batch_size=16,
+                  epochs=50,callbacks=cb(model_weights),
+                  validation_data=(x_valid1,y_valid1))
 
-[handle_base,pixels]=["mobilenet_v2_140_224",224]
-mhandle="https://tfhub.dev/google/imagenet/{}/feature_vector/4"\
-.format(handle_base)
+model.load_weights(model_weights)
+model.evaluate(x_test1,y_test1,verbose=0)
 
-[x_train1,x_valid1,x_test1]=\
-display_resize(x_train1,x_valid1,x_test1,
-               y_valid1,cy_valid1,pixels)
+[handle_base,img_size]=['mobilenet_v2_140_224',224]
+model_handle='https://tfhub.dev/google/imagenet/'+\
+             '{}/feature_vector/4'.format(handle_base)
 
-model=premodel(pixels,1024,mhandle,7)
+model=premodel(img_size,1024,model_handle,7)
 
-history=model.fit(x=x_train1,y=cy_train1,batch_size=16,
-                  epochs=50,callbacks=cb(fw),
-                  validation_data=(x_valid1,cy_valid1))
+[x_train1,x_valid1,x_test1]=display_resize(
+    x_train1,x_valid1,x_test1,y_valid1,img_size)
 
-model.load_weights(fw)
-model.evaluate(x_test1,cy_test1)
+history=model.fit(x=x_train1,y=y_train1,batch_size=16,
+                  epochs=50,callbacks=cb(model_weights),
+                  validation_data=(x_valid1,y_valid1))
+
+model.load_weights(model_weights)
+print(model.evaluate(x_test1,y_test1,verbose=0))
 del x_train1,x_valid1,x_test1,\
-y_train1,y_valid1,y_test1,\
-cy_train1,cy_valid1,cy_test1
+y_train1,y_valid1,y_test1
 
-dhtml('#2')
-[handle_base,pixels]=["mobilenet_v2_050_96",96]
-mhandle="https://tfhub.dev/google/imagenet/{}/feature_vector/4"\
-.format(handle_base)
+# Commented out IPython magic to ensure Python compatibility.
+# %radial_gradient_header Set #2
+[handle_base,img_size]=['mobilenet_v2_050_96',96]
+model_handle='https://tfhub.dev/google/imagenet/'+\
+             '{}/feature_vector/4'.format(handle_base)
 
-[x_train2,x_valid2,x_test2]=\
-display_resize(x_train2,x_valid2,x_test2,
-               y_valid2,cy_valid2,pixels)
+model=premodel(img_size,512,model_handle,33)
 
-model=premodel(pixels,512,mhandle,10)
+[x_train2,x_valid2,x_test2]=display_resize(
+    x_train2,x_valid2,x_test2,y_valid2,img_size)
 
-history=model.fit(x=x_train2,y=cy_train2,batch_size=64,
-                  epochs=10,callbacks=cb(fw),
-                  validation_data=(x_valid2,cy_valid2))
+history=model.fit(x=x_train2,y=y_train2,batch_size=64,
+                  epochs=70,callbacks=cb(model_weights),
+                  validation_data=(x_valid2,y_valid2))
 
-model.load_weights(fw)
-model.evaluate(x_test2,cy_test2)
-
-#[handle_base,pixels]=["mobilenet_v2_075_96",96]
-#mhandle="https://tfhub.dev/google/imagenet/{}/feature_vector/4"\
-#.format(handle_base)
-
-#model=premodel(pixels,1024,mhandle,10)
-
-#history=model.fit(x=x_train2,y=cy_train2,batch_size=64,
-#                  epochs=10,callbacks=cb(fw),
-#                  validation_data=(x_valid2,cy_valid2))
-
-#model.load_weights(fw)
-#model.evaluate(x_test2,cy_test2)
+model.load_weights(model_weights)
+print(model.evaluate(x_test2,y_test2,verbose=0))
 del x_train2,x_valid2,x_test2,\
-y_train2,y_valid2,y_test2,\
-cy_train2,cy_valid2,cy_test2
+y_train2,y_valid2,y_test2
 
-dhtml('#3')
-[handle_base,pixels]=["mobilenet_v2_050_96",96]
-mhandle="https://tfhub.dev/google/imagenet/{}/feature_vector/4"\
-.format(handle_base)
+# Commented out IPython magic to ensure Python compatibility.
+# %radial_gradient_header Set #3
+[handle_base,img_size]=['mobilenet_v1_100_128',128]
+model_handle='https://tfhub.dev/google/imagenet/'+\
+             '{}/feature_vector/4'.format(handle_base)
 
-[x_train3,x_valid3,x_test3]=\
-display_resize(x_train3,x_valid3,x_test3,
-               y_valid3,cy_valid3,pixels)
+model=premodel(img_size,512,model_handle,10)
 
-model=premodel(pixels,512,mhandle,33)
+[x_train3,x_valid3,x_test3]=display_resize(
+    x_train3,x_valid3,x_test3,y_valid3,img_size)
 
-history=model.fit(x=x_train3,y=cy_train3,batch_size=64,
-                  epochs=50,callbacks=cb(fw),
-                  validation_data=(x_valid3,cy_valid3))
+history=model.fit(x=x_train3,y=y_train3,batch_size=12,
+                  epochs=50,callbacks=cb(model_weights),
+                  validation_data=(x_valid3,y_valid3))
 
-model.load_weights(fw)
-model.evaluate(x_test3,cy_test3)
+model.load_weights(model_weights)
+model.evaluate(x_test3,y_test3,verbose=0)
+
+[handle_base,img_size]=['mobilenet_v2_130_224',224]
+model_handle='https://tfhub.dev/google/imagenet/'+\
+             '{}/feature_vector/4'.format(handle_base)
+
+model=premodel(img_size,512,model_handle,10)
+
+[x_train3,x_valid3,x_test3]=display_resize(
+    x_train3,x_valid3,x_test3,y_valid3,img_size)
+
+history=model.fit(x=x_train3,y=y_train3,batch_size=12,
+                  epochs=50,callbacks=cb(model_weights),
+                  validation_data=(x_valid3,y_valid3))
+
+model.load_weights(model_weights)
+print(model.evaluate(x_test3,y_test3,verbose=0))
 del x_train3,x_valid3,x_test3,\
-y_train3,y_valid3,y_test3,\
-cy_train3,cy_valid3,cy_test3
+y_train3,y_valid3,y_test3
 
-dhtml('#4')
-[handle_base,pixels]=["mobilenet_v1_100_128",128]
-mhandle="https://tfhub.dev/google/imagenet/{}/feature_vector/4"\
-.format(handle_base)
+# Commented out IPython magic to ensure Python compatibility.
+# %radial_gradient_header Set #4
+[handle_base,img_size]=['mobilenet_v2_050_96',96]
+model_handle='https://tfhub.dev/google/imagenet/'+\
+             '{}/feature_vector/4'.format(handle_base)
 
-model=premodel(pixels,512,mhandle,10)
+model=premodel(img_size,512,model_handle,10)
 
-history=model.fit(x=x_train4,y=cy_train4,batch_size=12,
-                  epochs=50,callbacks=cb(fw),
-                  validation_data=(x_valid4,cy_valid4))
+[x_train4,x_valid4,x_test4]=display_resize(
+    x_train4,x_valid4,x_test4,y_valid4,img_size)
 
-model.load_weights(fw)
-model.evaluate(x_test4,cy_test4)
+history=model.fit(x=x_train4,y=y_train4,batch_size=64,
+                  epochs=10,callbacks=cb(model_weights),
+                  validation_data=(x_valid4,y_valid4))
 
-[handle_base,pixels]=["mobilenet_v2_130_224",224]
-mhandle="https://tfhub.dev/google/imagenet/{}/feature_vector/4"\
-.format(handle_base)
+model.load_weights(model_weights)
+model.evaluate(x_test4,y_test4,verbose=0)
 
-[x_train4,x_valid4,x_test4]=\
-display_resize(x_train4,x_valid4,x_test4,
-               y_valid4,cy_valid4,pixels)
+#[handle_base,img_size]=['mobilenet_v2_075_96',96]
+#model_handle='https://tfhub.dev/google/imagenet/'+\
+#             '{}/feature_vector/4'.format(handle_base)
 
-model=premodel(pixels,512,mhandle,10)
+#model=premodel(img_size,1024,model_handle,10)
 
-history=model.fit(x=x_train4,y=cy_train4,batch_size=12,
-                  epochs=50,callbacks=cb(fw),
-                  validation_data=(x_valid4,cy_valid4))
+#history=model.fit(x=x_train4,y=y_train4,batch_size=64,
+#                  epochs=10,callbacks=cb(model_weights),
+#                  validation_data=(x_valid4,y_valid4))
 
-model.load_weights(fw)
-model.evaluate(x_test4,cy_test4)
-
-dhtml('In Progress')
+model.load_weights(model_weights)
+print(model.evaluate(x_test4,y_test4,verbose=0))
