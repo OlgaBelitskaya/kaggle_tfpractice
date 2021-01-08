@@ -20,30 +20,28 @@ Reading classics [Python Machine Learning 3rd Edition](https://github.com/rasbt/
 # def cmap_header(params):
 #     params=params.split('|'); string=params[0]
 #     if len(params)==1: 
-#         font_size=30; font_family='Akronim'; cmap='Sinebow'
+#         font_size='30'; font_family='Akronim'; cmap='Sinebow'
 #     elif  len(params)==2: 
-#         font_size=int(params[1])
+#         font_size=params[1]
 #         font_family='Akronim'; cmap='Sinebow'
 #     elif  len(params)==3: 
-#         font_size=int(params[1]); font_family=params[2]
+#         font_size=params[1]; font_family=params[2]
 #         cmap='Sinebow'
 #     else: 
-#         font_size=int(params[1]); font_family=params[2]
-#         cmap=params[3]
-#     height=font_size*2.5
-#     randi=str(random.uniform(0,9999999))
+#         font_size=params[1]; font_family=params[2]; cmap=params[3]
+#     height=int(font_size)*2.5; randi=str(random.uniform(0,9999999))
 #     html_str="""
 #     <head><script src='https://d3js.org/d3.v6.min.js'></script>
 #     </head><style>@import 'https://fonts.googleapis.com/css?family="""+\
-#     font_family+"""&effect=3d'; #colorized1 {font-family:"""+font_family+\
-#     """; color:white; padding-left:10px; font-size:"""+str(font_size)+\
-#     """px;}</style><h1 id='colorized1' class='font-effect-3d'>"""+string+\
-#     """</h1><script>
+#     font_family+"""&effect=3d'; #colorized {font-family:"""+font_family+\
+#     """; color:white; padding-left:10px; font-size:"""+font_size+\
+#     """px;}</style><h1 id='colorized' class='font-effect-3d'>"""+\
+#     string+"""</h1><script>
 #     var tc=setInterval(function(){
 #         var now=new Date().getTime();
-#         var iddoc1=document.getElementById('colorized1');
-#         iddoc1.style.color=d3.interpolate"""+cmap+\
-#     """(now%(60000)/60000);},1)</script>"""
+#         var iddoc=document.getElementById('colorized');
+#         iddoc.style.color=d3.interpolate"""+cmap+\
+#     """(now%(30000)/30000);},1)</script>"""
 #     file='d3header'+randi+'.html'
 #     with open(file,'w') as f:
 #          f.write(html_str); f.close()
@@ -65,21 +63,17 @@ import sklearn.model_selection as sms
 
 # Commented out IPython magic to ensure Python compatibility.
 def phtml(str):
-    display(HTML("""<style>
-    @import 'https://fonts.googleapis.com/css?family=Aladin&effect=3d-float';      
+    display(HTML("""<style>@import 
+    'https://fonts.googleapis.com/css?family=Aladin&effect=3d-float';      
     </style><h1 class='font-effect-3d-float' 
     style='font-family:Aladin; color:#ee55ee; font-size:20px;'>
 #     %s</h1>"""%str))
 def pd_style():
-    return [dict(selector='th',
-                 props=[('font-size','10pt')]),
-            dict(selector='td',
-                 props=[('padding','0em 0em')]),
-            dict(selector='th:hover',
-                 props=[('font-size','12pt')]),
+    return [dict(selector='th',props=[('font-size','10pt')]),
+            dict(selector='td',props=[('padding','0em 0em')]),
+            dict(selector='th:hover',props=[('font-size','12pt')]),
             dict(selector='tr:hover td:hover',
-                 props=[('max-width','200px'),
-                        ('font-size','10pt')])]
+                 props=[('max-width','200px'),('font-size','10pt')])]
 
 # Commented out IPython magic to ensure Python compatibility.
 # %cmap_header Data Processing
