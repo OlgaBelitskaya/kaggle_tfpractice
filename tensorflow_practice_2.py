@@ -77,7 +77,7 @@ Original file is located at
 # Commented out IPython magic to ensure Python compatibility.
 # %%html
 # <style>
-# @import url('https://fonts.googleapis.com/css?family=Ewert|Roboto&effect=3d');
+# @import 'https://fonts.googleapis.com/css?family=Roboto';
 # span {text-shadow:3px 3px 3px #aaa;}  
 # div.output_area pre{font-family:Roboto; font-size:110%; color:#36ff36;}      
 # </style>
@@ -87,8 +87,9 @@ import h5py,pylab as pl,pandas as pd
 import numpy as np,tensorflow as tf
 import neural_structured_learning as nsl
 from sklearn.model_selection import train_test_split
-fpath3='../input/classification-of-handwritten-letters/'
-fpath4='../input/flower-color-images/'
+file_path3='../input/classification-of-handwritten-letters/'
+file_path4='../input/flower-color-images/'
+model_weights='/checkpoints'
 
 def prepro(x_train,y_train,x_test,y_test):
     n=int(len(x_test)/2)    
@@ -98,9 +99,32 @@ def prepro(x_train,y_train,x_test,y_test):
                      [y_train.shape,y_valid.shape,y_test.shape]],
                     columns=['train','valid','test'],
                     index=['image arrays','label arrays'])
-    display(df)
+    display(df.style.set_table_styles(pd_style()))
     return [[x_train,x_valid,x_test],
             [y_train,y_valid,y_test]]
+def pd_style():
+    return [dict(selector='th',
+                 props=[('font-size','12pt'),('min-width','150px')]),
+            dict(selector='td',
+                 props=[('padding','0em 0em'),('min-width','150px')]),
+            dict(selector='tr:hover th:hover',
+                 props=[('font-size','14pt'),('max-width','150px'),
+                        ('text-shadow','3px 3px 3px #aaa')]),
+            dict(selector='tr:hover td:hover',
+                 props=[('font-size','12pt'),('max-width','150px'),
+                        ('text-shadow','3px 3px 3px #aaa')])]
+def cb(mw):
+    early_stopping=tf.keras.callbacks.EarlyStopping(
+        monitor='val_sparse_categorical_accuracy',
+        patience=20,verbose=2,mode='max')
+    checkpointer=tf.keras.callbacks.ModelCheckpoint(
+        save_best_only=True,save_weights_only=True,
+        monitor='val_sparse_categorical_accuracy',
+        filepath=mw,verbose=2,mode='max')
+    lr_reduction=tf.keras.callbacks.ReduceLROnPlateau(
+        monitor='val_sparse_categorical_accuracy',
+        verbose=2,patience=5,factor=.8,mode='max')
+    return [checkpointer,early_stopping,lr_reduction]
 
 # Commented out IPython magic to ensure Python compatibility.
 # %decor_header Data Loading & Preprocessing
@@ -118,7 +142,7 @@ tf.keras.datasets.cifar10.load_data()
  [y_train2,y_valid2,y_test2]]=\
 prepro(x_train2/255,y_train2,x_test2/255,y_test2)
 
-f=h5py.File(fpath3+'LetterColorImages_123.h5','r') 
+f=h5py.File(file_path3+'LetterColorImages_123.h5','r') 
 keys=list(f.keys()); print(keys)
 images=np.array(f[keys[1]]).astype('float32')/255
 labels=np.array(f[keys[2]]).astype('int32').reshape(-1,1)-1
@@ -129,7 +153,7 @@ del images,labels
  [y_train3,y_valid3,y_test3]]=\
 prepro(x_train3,y_train3,x_test3,y_test3)
 
-f=h5py.File(fpath4+'FlowerColorImages.h5','r') 
+f=h5py.File(file_path4+'FlowerColorImages.h5','r') 
 keys=list(f.keys()); print(keys)
 images=np.array(f[keys[0]]).astype('float32')/255
 labels=np.array(f[keys[1]]).astype('int32').reshape(-1,1)
@@ -153,13 +177,12 @@ base_model=tf.keras.Sequential([
     tf.keras.layers.Dense(256,activation=tf.nn.relu),
     tf.keras.layers.Dense(n_class,activation=tf.nn.softmax)
 ])
-adv_config=nsl.configs\
-.make_adv_reg_config(multiplier=.2,adv_step_size=.05)
-adv_model=nsl.keras\
-.AdversarialRegularization(base_model,adv_config=adv_config)
-adv_model.compile(optimizer='adam',
-                  loss='sparse_categorical_crossentropy',
-                  metrics=['accuracy'])
+adv_config=nsl.configs.make_adv_reg_config(
+    multiplier=.2,adv_step_size=.05)
+adv_model=nsl.keras.AdversarialRegularization(
+    base_model,adv_config=adv_config)
+adv_model.compile(optimizer='adam',metrics=['accuracy'],
+                  loss='sparse_categorical_crossentropy')
 
 train1=tf.data.Dataset.from_tensor_slices(
     {'input':x_train1,'label':y_train1}).batch(batch_size)
@@ -167,9 +190,12 @@ valid1=tf.data.Dataset.from_tensor_slices(
     {'input':x_valid1,'label':y_valid1}).batch(batch_size)
 valid_steps=x_valid1.shape[0]//batch_size
 adv_model.fit(train1,validation_data=valid1,verbose=2,
-              validation_steps=valid_steps,epochs=epochs)
+              validation_steps=valid_steps,
+              epochs=epochs,callbacks=cb(model_weights));
 
-adv_model.evaluate({'input':x_test1,'label':y_test1})
+adv_model.load_weights(model_weights)
+dict(zip(adv_model.metrics_names,adv_model.evaluate(
+    {'input':x_test1,'label':y_test1},verbose=0)))
 
 batch_size=64; img_size=32; n_class=10; epochs=7
 base_model=tf.keras.models.Sequential([
@@ -188,9 +214,8 @@ adv_config=nsl.configs\
 .make_adv_reg_config(multiplier=.2,adv_step_size=.05)
 adv_model=nsl.keras\
 .AdversarialRegularization(base_model,adv_config=adv_config)
-adv_model.compile(optimizer='adam',
-                  loss='sparse_categorical_crossentropy',
-                  metrics=['accuracy'])
+adv_model.compile(optimizer='adam',metrics=['accuracy'],
+                  loss='sparse_categorical_crossentropy')
 
 train2=tf.data.Dataset.from_tensor_slices(
     {'input':x_train2,'label':y_train2}).batch(batch_size)
@@ -198,9 +223,12 @@ valid2=tf.data.Dataset.from_tensor_slices(
     {'input':x_valid2,'label':y_valid2}).batch(batch_size)
 valid_steps=x_valid2.shape[0]//batch_size
 adv_model.fit(train2,validation_data=valid2,verbose=2,
-              validation_steps=valid_steps,epochs=epochs)
+              validation_steps=valid_steps,
+              epochs=epochs,callbacks=cb(model_weights));
 
-adv_model.evaluate({'input':x_test2,'label':y_test2})
+adv_model.load_weights(model_weights)
+dict(zip(adv_model.metrics_names,adv_model.evaluate(
+    {'input':x_test2,'label':y_test2},verbose=0)))
 
 batch_size=128; img_size=32; n_class=33; epochs=100
 base_model=tf.keras.models.Sequential([
@@ -219,9 +247,8 @@ adv_config=nsl.configs\
 .make_adv_reg_config(multiplier=.2,adv_step_size=.05)
 adv_model=nsl.keras\
 .AdversarialRegularization(base_model,adv_config=adv_config)
-adv_model.compile(optimizer='adam',
-                  loss='sparse_categorical_crossentropy',
-                  metrics=['accuracy'])
+adv_model.compile(optimizer='adam',metrics=['accuracy'],
+                  loss='sparse_categorical_crossentropy')
 
 train3=tf.data.Dataset.from_tensor_slices(
     {'input':x_train3,'label':y_train3}).batch(batch_size)
@@ -229,9 +256,12 @@ valid3=tf.data.Dataset.from_tensor_slices(
     {'input':x_valid3,'label':y_valid3}).batch(batch_size)
 valid_steps=x_valid3.shape[0]//batch_size
 adv_model.fit(train3,validation_data=valid3,verbose=2,
-              validation_steps=valid_steps,epochs=epochs)
+              validation_steps=valid_steps,
+              epochs=epochs,callbacks=cb(model_weights));
 
-adv_model.evaluate({'input':x_test3,'label':y_test3})
+adv_model.load_weights(model_weights)
+dict(zip(adv_model.metrics_names,adv_model.evaluate(
+    {'input':x_test3,'label':y_test3},verbose=0)))
 
 batch_size=16; img_size=128; n_class=10; epochs=100
 base_model=tf.keras.models.Sequential([
@@ -250,9 +280,8 @@ adv_config=nsl.configs\
 .make_adv_reg_config(multiplier=.2,adv_step_size=.05)
 adv_model=nsl.keras\
 .AdversarialRegularization(base_model,adv_config=adv_config)
-adv_model.compile(optimizer='adam',
-                  loss='sparse_categorical_crossentropy',
-                  metrics=['accuracy'])
+adv_model.compile(optimizer='adam',metrics=['accuracy'],
+                  loss='sparse_categorical_crossentropy')
 
 train4=tf.data.Dataset.from_tensor_slices(
     {'input':x_train4,'label':y_train4}).batch(batch_size)
@@ -260,9 +289,12 @@ valid4=tf.data.Dataset.from_tensor_slices(
     {'input':x_valid4,'label':y_valid4}).batch(batch_size)
 valid_steps=x_valid4.shape[0]//batch_size
 adv_model.fit(train4,validation_data=valid4,verbose=2,
-              validation_steps=valid_steps,epochs=epochs)
+              validation_steps=valid_steps,
+              epochs=epochs,callbacks=cb(model_weights));
 
-adv_model.evaluate({'input':x_test4,'label':y_test4})
+adv_model.load_weights(model_weights)
+dict(zip(adv_model.metrics_names,adv_model.evaluate(
+    {'input':x_test4,'label':y_test4},verbose=0)))
 
 # Commented out IPython magic to ensure Python compatibility.
 # %decor_header CNN Base|18
@@ -291,9 +323,8 @@ adv_config=nsl.configs\
 .make_adv_reg_config(multiplier=.2,adv_step_size=.05)
 adv_model=nsl.keras\
 .AdversarialRegularization(base_model,adv_config=adv_config)
-adv_model.compile(optimizer='adam',
-                  loss='sparse_categorical_crossentropy',
-                  metrics=['accuracy'])
+adv_model.compile(optimizer='adam',metrics=['accuracy'],
+                  loss='sparse_categorical_crossentropy')
 
 train1=tf.data.Dataset.from_tensor_slices(
     {'input':x_train1.reshape(x_train1.shape[0],28,28,1),
@@ -303,10 +334,14 @@ valid1=tf.data.Dataset.from_tensor_slices(
      'label':y_valid1}).batch(batch_size)
 valid_steps=x_valid1.shape[0]//batch_size
 adv_model.fit(train1,validation_data=valid1,verbose=2,
-              validation_steps=valid_steps,epochs=epochs)
+              validation_steps=valid_steps,
+              epochs=epochs,callbacks=cb(model_weights));
 
-adv_model.evaluate({'input':x_test1.reshape(x_test1.shape[0],28,28,1),
-                    'label':y_test1})
+adv_model.load_weights(model_weights)
+dict(zip(adv_model.metrics_names,
+         adv_model.evaluate(
+             {'input':x_test1.reshape(x_test1.shape[0],28,28,1),
+              'label':y_test1},verbose=0)))
 
 batch_size=64; img_size=32; n_class=10; epochs=20
 base_model=tf.keras.Sequential([
@@ -329,9 +364,8 @@ adv_config=nsl.configs\
 .make_adv_reg_config(multiplier=.2,adv_step_size=.05)
 adv_model=nsl.keras\
 .AdversarialRegularization(base_model,adv_config=adv_config)
-adv_model.compile(optimizer='adam',
-                  loss='sparse_categorical_crossentropy',
-                  metrics=['accuracy'])
+adv_model.compile(optimizer='adam',metrics=['accuracy'],
+                  loss='sparse_categorical_crossentropy')
 
 train2=tf.data.Dataset.from_tensor_slices(
     {'input':x_train2,'label':y_train2}).batch(batch_size)
@@ -339,9 +373,13 @@ valid2=tf.data.Dataset.from_tensor_slices(
     {'input':x_valid2,'label':y_valid2}).batch(batch_size)
 valid_steps=x_valid2.shape[0]//batch_size
 adv_model.fit(train2,validation_data=valid2,verbose=2,
-              validation_steps=valid_steps,epochs=epochs)
+              validation_steps=valid_steps,
+              epochs=epochs,callbacks=cb(model_weights));
 
-adv_model.evaluate({'input':x_test2,'label':y_test2})
+adv_model.load_weights(model_weights)
+dict(zip(adv_model.metrics_names,
+         adv_model.evaluate(
+             {'input':x_test2,'label':y_test2},verbose=0)))
 
 batch_size=128; img_size=32; n_class=33; epochs=150
 base_model=tf.keras.Sequential([
@@ -364,9 +402,8 @@ adv_config=nsl.configs\
 .make_adv_reg_config(multiplier=.2,adv_step_size=.05)
 adv_model=nsl.keras\
 .AdversarialRegularization(base_model,adv_config=adv_config)
-adv_model.compile(optimizer='adam',
-                  loss='sparse_categorical_crossentropy',
-                  metrics=['accuracy'])
+adv_model.compile(optimizer='adam',metrics=['accuracy'],
+                  loss='sparse_categorical_crossentropy')
 
 train3=tf.data.Dataset.from_tensor_slices(
     {'input':x_train3,'label':y_train3}).batch(batch_size)
@@ -374,11 +411,15 @@ valid3=tf.data.Dataset.from_tensor_slices(
     {'input':x_valid3,'label':y_valid3}).batch(batch_size)
 valid_steps=x_valid3.shape[0]//batch_size
 adv_model.fit(train3,validation_data=valid3,verbose=2,
-              validation_steps=valid_steps,epochs=epochs)
+              validation_steps=valid_steps,
+              epochs=epochs,callbacks=cb(model_weights));
 
-adv_model.evaluate({'input':x_test3,'label':y_test3})
+adv_model.load_weights(model_weights)
+dict(zip(adv_model.metrics_names,
+         adv_model.evaluate(
+             {'input':x_test3,'label':y_test3},verbose=0)))
 
-batch_size=16; img_size=32; n_class=10; epochs=100
+batch_size=16; img_size=128; n_class=10; epochs=100
 base_model=tf.keras.Sequential([
     tf.keras.Input((img_size,img_size,3),name='input'),
     tf.keras.layers.Conv2D(32,(5,5),padding='same'),
@@ -399,9 +440,8 @@ adv_config=nsl.configs\
 .make_adv_reg_config(multiplier=.2,adv_step_size=.05)
 adv_model=nsl.keras\
 .AdversarialRegularization(base_model,adv_config=adv_config)
-adv_model.compile(optimizer='adam',
-                  loss='sparse_categorical_crossentropy',
-                  metrics=['accuracy'])
+adv_model.compile(optimizer='adam',metrics=['accuracy'],
+                  loss='sparse_categorical_crossentropy')
 
 train4=tf.data.Dataset.from_tensor_slices(
     {'input':x_train4,'label':y_train4}).batch(batch_size)
@@ -409,6 +449,10 @@ valid4=tf.data.Dataset.from_tensor_slices(
     {'input':x_valid4,'label':y_valid4}).batch(batch_size)
 valid_steps=x_valid4.shape[0]//batch_size
 adv_model.fit(train4,validation_data=valid4,verbose=2,
-              validation_steps=valid_steps,epochs=epochs)
+              validation_steps=valid_steps,
+              epochs=epochs,callbacks=cb(model_weights));
 
-adv_model.evaluate({'input':x_test4,'label':y_test4})
+adv_model.load_weights(model_weights)
+dict(zip(adv_model.metrics_names,
+         adv_model.evaluate(
+             {'input':x_test4,'label':y_test4},verbose=0)))
