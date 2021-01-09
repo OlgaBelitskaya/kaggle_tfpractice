@@ -137,9 +137,7 @@ categorical_features=\
 [tf.feature_column.indicator_column(forigin)]
 phtml(str(categorical_features[0]))
 
-features=(numeric_features+
-          bucketized_features+ 
-          categorical_features)
+features=(numeric_features+bucketized_features+categorical_features)
 dfn_train,dfn_test=\
 sms.train_test_split(dfn,train_size=.8,shuffle=True)
 phtml(str([len(dfn_train),len(dfn_test)]))
@@ -149,7 +147,7 @@ def train_input_fn(dfn_train,batch_size):
     dft=dfn_train.copy()
     x_train,y_train=dft,dft.pop('MPG')
     ds_train=tds.from_tensor_slices((dict(x_train),y_train))
-    return ds_train.shuffle(1000).repeat().batch(batch_size)
+    return ds_train.shuffle(len(x_train)).repeat().batch(batch_size)
 ds_train=train_input_fn(dfn_train,batch_size)
 batch=next(iter(ds_train))
 phtml('keys: </br>%s'%batch[0].keys())
@@ -160,7 +158,7 @@ def test_input_fn(dfn_test,batch_size):
     x_test,y_test=dft2,dft2.pop('MPG')
     ds_test=tds.from_tensor_slices((dict(x_test),y_test))
     return ds_test.batch(batch_size)
-ds_test=train_input_fn(dfn_test,batch_size)
+ds_test=test_input_fn(dfn_test,batch_size)
 batch=next(iter(ds_test))
 phtml('keys: </br>%s'%batch[0].keys())
 phtml('batch values of `ModelYear`: </br>%s'%\
