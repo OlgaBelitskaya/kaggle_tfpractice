@@ -90,7 +90,8 @@ low2superbicubic_imgs(lr,sr)
 #     with tf.io.gfile.GFile('ESRGAN.tflite','wb') as f:
 #         f.write(tflite_model)
 #     esrgan_model_path='./ESRGAN.tflite'
-#     img_path=tf.keras.utils.get_file('img.png',img_path)
+#     img_path=tf.keras.utils.get_file(
+#         'img'+str(np.random.randint(1,99999))+'.png',img_path)
 #     lr=tf.io.read_file(img_path)
 #     lr=tf.image.decode_jpeg(lr)
 #     lr=tf.image.resize(lr,[img_size,img_size])
@@ -112,4 +113,7 @@ low2superbicubic_imgs(lr,sr)
 # Commented out IPython magic to ensure Python compatibility.
 # %run esrgantf2_superresolution.py
 lr,sr=esrgantf2_superresolution(file_path+'04_001.png',64)
+low2superbicubic_imgs(lr,sr)
+
+lr,sr=esrgantf2_superresolution(file_path+'01_019.png',64)
 low2superbicubic_imgs(lr,sr)
