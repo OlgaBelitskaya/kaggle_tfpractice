@@ -121,10 +121,11 @@ def interpolate_hypersphere(v1,v2,steps):
         interpolated_normalized=interpolated*(v1norm/interpolated_norm)
         vectors.append(interpolated_normalized)
     return tf.stack(vectors).numpy()
-
 lr1,sr1=esrgantf2_superresolution(x_train[0],img_size)
 lr2,sr2=esrgantf2_superresolution(x_train[1],img_size)
 img1=sr1.numpy()/255.; img2=sr2.numpy()/255.
+imageio.imwrite('img1.png',img1)
+imageio.imwrite('img2.png',img2)
 imgs=np.vstack([interpolate_hypersphere(img1,img2,30),
                 interpolate_hypersphere(img2,img1,30)])
 
@@ -133,6 +134,8 @@ imgs=np.array(imgs*255.,dtype=np.uint8)
 imageio.mimsave(file_name,imgs)
 Image(open('pic.gif','rb').read())
 
+"""## ✒️ HTML & Code Cells"""
+
 def array2string(a):
     astr=np.array2string(
         a.flatten(),separator=',',
@@ -140,8 +143,9 @@ def array2string(a):
     return astr.replace('\n ','')
 #array2string(img1)
 
-num_steps=30; fig_size=3
-html_page="""
+def animate_interpolation(
+    file_name1,file_name2,img_size=128,num_steps=30,fig_size=3):
+    html_page="""
 <!DOCTYPE HTML>
 <html>
   <head>
@@ -157,7 +161,7 @@ html_page="""
   <body>
 <div class='animate'><script type='text/x-sage'>
 file_path='https://olgabelitskaya.gitlab.io/images/'
-file1='01_001.png'; file2='01_002.png'
+file1='"""+file_name1+"""'; file2='"""+file_name2+"""'
 import numpy as np,cv2,urllib
 def interpolate_hypersphere(v1,v2,steps):
     v1norm=np.linalg.norm(v1)
@@ -167,11 +171,10 @@ def interpolate_hypersphere(v1,v2,steps):
     for step in range(steps):
         interpolated=v1+(v2normalized-v1)*step/(steps-int(1))
         interpolated_norm=np.linalg.norm(interpolated)
-        interpolated_normalized=\
-        interpolated*(v1norm/interpolated_norm)
+        interpolated_normalized=interpolated*(v1norm/interpolated_norm)
         vectors.append(interpolated_normalized)
     return np.array(vectors)
-def get_img(file_name,file_path=file_path,img_size=int(64)):
+def get_img(file_name,file_path=file_path,img_size=int("""+str(img_size)+""")):
     input_file=urllib.request.urlopen(file_path+file_name)
     output_file=open(file_name,'wb')
     output_file.write(input_file.read())
@@ -179,23 +182,27 @@ def get_img(file_name,file_path=file_path,img_size=int(64)):
     img=cv2.cvtColor(cv2.imread(file_name),cv2.COLOR_BGR2RGB)
     return cv2.resize(img,(img_size,img_size))/255
 v1=get_img(file1); v2=get_img(file2)
-imgs=np.vstack([interpolate_hypersphere(v1,v2,int(20)),
-                interpolate_hypersphere(v2,v1,int(20))])
+imgs=np.vstack([interpolate_hypersphere(v1,v2,int("""+str(num_steps)+""")),
+                interpolate_hypersphere(v2,v1,int("""+str(num_steps)+"""))])
 animate([matrix_plot(
-    imgs[i],figsize=(3,3),frame=False) 
-         for i in range(40)])
+    imgs[i],figsize=("""+str(fig_size)+""","""+str(fig_size)+\
+    """),frame=False) for i in range("""+str(2*num_steps)+""")])
 </script></div><br/>       
   </body>
 </html>"""
-
-print(html_page)
-
-randi=str(np.random.randint(0,9999999))
-file='animate_interpolation'+randi+'.html'
-with open(file,'w') as f:
-    f.write(html_page); f.close()
-string="""<div id='html_string"""+randi+\
+    randi=str(np.random.randint(0,9999999))
+    file='animate_interpolation'+randi+'.html'
+    with open(file,'w') as f:
+        f.write(html_page); f.close()
+    string="""<div id='html_string"""+randi+\
 """' style='width:100%;'><iframe src='"""+file+\
-"""' height="""+str(fig_size*100)+"""
+"""' height="""+str(fig_size*150)+"""
 style='display:block; width:100%;'></iframe></div>"""
-display(HTML(string))
+    display(HTML(string))
+    return html_page
+
+file_name1='07_001.png'; file_name2='07_002.png'
+fig_size=3; num_steps=30; img_size=96
+html_page=animate_interpolation(
+    file_name1,file_name2,
+    img_size=img_size,num_steps=num_steps,fig_size=fig_size)
