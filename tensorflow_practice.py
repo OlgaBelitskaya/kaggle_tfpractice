@@ -9,115 +9,126 @@ Original file is located at
 <h1 class='font-effect-3d' style='font-family:Ewert; color:#ff603b;'>Modules, Helpful Functions, & Styling</h1>
 """
 
-import warnings; warnings.filterwarnings('ignore')
-import numpy as np,pandas as pd
-import tensorflow_hub as th
-import h5py,pylab as pl
-import tensorflow as tf,keras as ks
-from sklearn.model_selection import train_test_split
-from IPython.display import display,HTML
-import PIL.Image
-
 # Commented out IPython magic to ensure Python compatibility.
 # %%html
 # <style>
-# @import url('https://fonts.googleapis.com/css?family=Ewert|Roboto&effect=3d');
-# span {font-family:Roboto; color:black; text-shadow:3px 3px 3px #aaa;}  
-# div.output_area pre{font-family:Roboto; font-size:110%; color:#ff603b;}      
+# @import url('https://fonts.googleapis.com/css?family=Ewert|Aladin&effect=3d');
+# span {color:black; text-shadow:3px 3px 3px #aaa;}  
+# div.output_area pre{font-family:Aladin; font-size:110%; color:#ff603b;}      
 # </style>
 
-fpath='../input/image-examples-for-mixed-styles/'
-fpath2='../input/flower-color-images/'
-hpath='https://tfhub.dev/google/magenta/'+\
-      'arbitrary-image-stylization-v1-256/1'
-fw1='weights.best.cifar.hdf5'
-fw2='weights.best.flowers.hdf5'
+import warnings; warnings.filterwarnings('ignore')
+import h5py,urllib,pylab as pl,seaborn as sn
+import numpy as np,pandas as pd
+import tensorflow_hub as th,tensorflow as tf
+import tensorflow.keras.layers as tkl
+from IPython.display import display,HTML
+import PIL.Image as pimg
+data_path='https://raw.githubusercontent.com/'+\
+          'OlgaBelitskaya/data_kitchen/main/'
+url_path='https://olgabelitskaya.gitlab.io/images/'
+file_path='../input/image-examples-for-mixed-styles/'
+file_path2='../input/flower-color-images/'
+hub_path='https://tfhub.dev/google/magenta/'+\
+         'arbitrary-image-stylization-v1-256/1'
+hub_path2='https://tfhub.dev/google/faster_rcnn/'+\
+          'openimages_v4/inception_resnet_v2/1'
+model_weights='/tmp/checkpoint'
+col='#ff603b'
+
+def get_file(file,url_path=url_path):
+    input_file=urllib.request.urlopen(url_path+file)
+    output_file=open(file,'wb'); 
+    output_file.write(input_file.read())
+    output_file.close(); input_file.close()
 def prepro(x_train,y_train,x_test,y_test):
     n=int(len(x_test)/2)
     x_valid,y_valid=x_test[:n],y_test[:n]
     x_test,y_test=x_test[n:],y_test[n:]
-    cy_train=ks.utils.to_categorical(y_train,10) 
-    cy_valid=ks.utils.to_categorical(y_valid,10)
-    cy_test=ks.utils.to_categorical(y_test,10)
     df=pd.DataFrame([[x_train.shape,x_valid.shape,x_test.shape],
-                     [y_train.shape,y_valid.shape,y_test.shape],
-                     [cy_train.shape,cy_valid.shape,cy_test.shape]],
+                     [y_train.shape,y_valid.shape,y_test.shape]],
                     columns=['train','valid','test'],
-                    index=['images','labels','encoded labels'])
+                    index=['images','labels'])
     display(df)
     return [[x_train,x_valid,x_test],
-            [y_train,y_valid,y_test],
-            [cy_train,cy_valid,cy_test]]
-def cb(fw):
-    early_stopping=tf.keras.callbacks\
-    .EarlyStopping(monitor='val_loss',patience=20,verbose=2)
-    checkpointer=tf.keras.callbacks\
-    .ModelCheckpoint(filepath=fw,save_best_only=True,verbose=2)
-    lr_reduction=tf.keras.callbacks\
-    .ReduceLROnPlateau(monitor='val_loss',verbose=2,
-                       patience=5,factor=.8)
-    return [checkpointer,early_stopping,lr_reduction]
-def load_img(path_to_img):
-    max_dim=512
-    img=tf.io.read_file(path_to_img)
+            [y_train,y_valid,y_test]]
+def load_img(path2img,max_dim=512):
+    img=tf.io.read_file(path2img)
     img=tf.image.decode_image(img,channels=3)
     img=tf.image.convert_image_dtype(img,tf.float32)
     shape=tf.cast(tf.shape(img)[:-1],tf.float32)
-    long_dim=max(shape)
-    scale=max_dim/long_dim
+    scale=max_dim/max(shape)
     new_shape=tf.cast(shape*scale,tf.int32)
     img=tf.image.resize(img,new_shape)
-    img=img[tf.newaxis,:]
-    return img
-def tensor_to_image(tensor):
-    tensor=tensor*255
-    tensor=np.array(tensor,dtype=np.uint8)
+    return img[tf.newaxis,:]
+def tensor2img(tensor):
+    tensor=np.array(tensor*255,dtype=np.uint8)
     if np.ndim(tensor)>3:
         assert tensor.shape[0]==1
         tensor=tensor[0]
-    return PIL.Image.fromarray(tensor)
+    return pimg.fromarray(tensor)
 
 """<h1 class='font-effect-3d' style='font-family:Ewert; color:#ff603b;'>Data Loading & Preprocessing</h1>"""
 
 (x_train1,y_train1),(x_test1,y_test1)=\
-ks.datasets.cifar10.load_data()
+tf.keras.datasets.cifar10.load_data()
 [[x_train1,x_valid1,x_test1],
- [y_train1,y_valid1,y_test1],
- [cy_train1,cy_valid1,cy_test1]]=\
+ [y_train1,y_valid1,y_test1]]=\
 prepro(x_train1,y_train1,x_test1,y_test1)
 
-cifar_labels=['airplane','automobile','bird','cat','deer',
+cifar_classes=['airplane','automobile','bird','cat','deer',
               'dog','frog','horse','ship','truck']
-pl.figure(figsize=(2,2)) 
-pl.xticks([]); pl.yticks([])
-pl.title(cifar_labels[y_train1[200][0]])
-pl.imshow(x_train1[200]);
+num_classes1=len(cifar_classes); img_size1=x_train1.shape[1]
+n=np.random.randint(0,x_train1.shape[0])
+pl.figure(figsize=(2,2)); pl.xticks([]); pl.yticks([])
+pl.title(cifar_classes[y_train1[n][0]],fontsize=16,color=col)
+pl.imshow(x_train1[n]); pl.tight_layout();
 
-f=h5py.File(fpath2+'FlowerColorImages.h5','r') 
-keys=list(f.keys()); keys
-images=np.array(f[keys[0]])/255
-labels=np.array(f[keys[1]]).astype('int').reshape(-1,1)
-x_train2,x_test2,y_train2,y_test2=\
-train_test_split(images,labels,test_size=.2,random_state=1)
-del images,labels
-[[x_train2,x_valid2,x_test2],
- [y_train2,y_valid2,y_test2],
- [cy_train2,cy_valid2,cy_test2]]=\
-prepro(x_train2,y_train2,x_test2,y_test2)
+data_file='Flowers128.h5'
+get_file(data_file,data_path)
+with h5py.File(data_file,'r') as f:
+    keys=list(f.keys())
+    print('h5py.File keys: '+', '.join(keys))
+    images=np.array(f[keys[0]])
+    labels=np.array(f[keys[1]])
+    names=[el.decode('utf-8')for el in f[keys[2]]]
+    f.close()
 
-flower_labels=['phlox','rose','calendula','iris',
-               'max chrysanthemum','bellflower','viola',
-               'rudbeckia laciniata','peony','aquilegia']
-pl.figure(figsize=(2,2)) 
-pl.xticks([]); pl.yticks([])
-pl.title(flower_labels[y_train2[150][0]])
-pl.imshow(x_train2[150]);
+df=pd.DataFrame(labels,columns=['label'])
+df['class']=[names[l] for l in labels]
+pl.figure(figsize=(8,4))
+sn.countplot(y='class',data=df,palette='OrRd',alpha=.5)
+ti='label distribution'
+pl.title(ti,fontsize=16,color=col)
+pl.tight_layout(); pl.show()
+
+N=labels.shape[0]; n=int(.1*N); shuffle_ids=np.arange(N)
+np.random.RandomState(12).shuffle(shuffle_ids)
+images=images[shuffle_ids]; labels=labels[shuffle_ids]
+num_classes2=len(names); img_size2=images.shape[1]
+x_test2,x_valid2,x_train2=images[:n],images[n:2*n],images[2*n:]
+y_test2,y_valid2,y_train2=labels[:n],labels[n:2*n],labels[2*n:]
+df=pd.DataFrame(
+    [[x_train2.shape,x_valid2.shape,x_test2.shape],
+     [x_train2.dtype,x_valid2.dtype,x_test2.dtype],
+     [y_train2.shape,y_valid2.shape,y_test2.shape],
+     [y_train2.dtype,y_valid2.dtype,y_test2.dtype]],
+    columns=['train','valid','test'],
+    index=['image shape','image type','label shape','label type'])
+fig=pl.figure(figsize=(8,4)); n=np.random.randint(1,100)
+for i in range(n,n+6):
+    ax=fig.add_subplot(2,3,i-n+1,xticks=[],yticks=[])
+    ax.set_title(
+        names[labels[i]],color=col,
+        fontdict={'fontsize':'large'})
+    ax.imshow((images[i]))
+pl.tight_layout(); pl.show(); display(df)
 
 """<h1 class='font-effect-3d' style='font-family:Ewert; color:#ff603b;'>Fast Examples</h1>"""
 
-content_image=load_img(fpath+'picture02.png')
+origin_img=load_img(file_path+'picture02.png')
 x=tf.keras.applications.vgg19\
-.preprocess_input(content_image*255)
+.preprocess_input(origin_img*255)
 x=tf.image.resize(x,(224,224))
 vgg19=tf.keras.applications\
 .VGG19(include_top=True,weights='imagenet')
@@ -126,126 +137,147 @@ predicted_top5=tf.keras.applications.vgg19\
 .decode_predictions(prediction_probabilities.numpy())[0]
 [print((class_name,prob)) 
  for (number,class_name,prob) in predicted_top5]
-tensor_to_image(content_image)
+tensor2img(origin_img)
 
-hub_module=th.load(hpath)  
-content_image=load_img(fpath+'picture03.png')
-style_image=load_img(fpath+'pattern05.png')
-stylized_image=hub_module(tf.constant(content_image),
-                          tf.constant(style_image))[0]
-tensor_to_image(stylized_image)
+detector=th.load(hub_path2).signatures['default']
+result=detector(origin_img)
+df=pd.DataFrame.from_dict(
+    {key:list(value.numpy()) for key,value in result.items()})
+df.head(10)
 
-"""<h1 class='font-effect-3d' style='font-family:Ewert; color:#ff603b;'>Keras Models </h1>
-MLP
-"""
+origin='06_001.png'; style='02_014.png'
+def origin2style(origin,style,hub_path):
+    get_file(origin); get_file(style)
+    hub_module=th.load(hub_path)
+    origin_img=load_img(origin); style_img=load_img(style)
+    stylized_img=hub_module(
+        tf.constant(origin_img),tf.constant(style_img))[0]
+    display(tensor2img(stylized_img))
+origin2style(origin,style,hub_path)
 
-def mlp_model(s):
+origin='01_016.png'; style='02_018.png'
+origin2style(origin,style,hub_path)
+
+"""<h1 class='font-effect-3d' style='font-family:Ewert; color:#ff603b;'>Simple Models </h1>"""
+
+def cb(model_weights):
+    early_stopping=tf.keras.callbacks.EarlyStopping(
+        monitor='val_loss',patience=20,verbose=2)
+    checkpointer=tf.keras.callbacks.ModelCheckpoint(
+filepath=model_weights,verbose=int(2),save_weights_only=True,
+    monitor='val_accuracy',mode='max',save_best_only=True)
+    lr_reduction=tf.keras.callbacks.ReduceLROnPlateau(
+        monitor='val_loss',verbose=2,patience=7,factor=.8)
+    return [checkpointer,early_stopping,lr_reduction]
+
+"""<h2 style='font-family:Aladin; color:#ff603b;'>MLP</h2>"""
+
+def mlp_model(img_size,num_classes):
     model=tf.keras.models.Sequential([
-        tf.keras.layers.Flatten(input_shape=(s,s,3)),
-        tf.keras.layers.Dense(128,activation='relu'),
-        tf.keras.layers.BatchNormalization(),    
-        tf.keras.layers.Dense(256,activation='relu'),
-        tf.keras.layers.BatchNormalization(),    
-        tf.keras.layers.Dense(512,activation='relu'),
-        tf.keras.layers.BatchNormalization(),   
-        tf.keras.layers.Dense(1024,activation='relu'),
-        tf.keras.layers.Dropout(.2),
-        tf.keras.layers.Dense(10,activation='softmax')
-    ])
-    model.compile(optimizer='adam',
+        tkl.Flatten(input_shape=(img_size,img_size,3)),
+        tkl.Dense(128),tkl.LeakyReLU(alpha=.02),
+        tkl.BatchNormalization(),    
+        tkl.Dense(256),tkl.LeakyReLU(alpha=.02),
+        tkl.BatchNormalization(),    
+        tkl.Dense(512),tkl.LeakyReLU(alpha=.02),
+        tkl.BatchNormalization(),   
+        tkl.Dense(1024),tkl.LeakyReLU(alpha=.02),
+        tkl.Dropout(.2),
+        tkl.Dense(num_classes,activation='softmax')])
+    model.compile(optimizer='nadam',
                   loss='sparse_categorical_crossentropy',
                   metrics=['accuracy'])
     return model
 
-model=mlp_model(32)
+model=mlp_model(img_size1,num_classes1)
 model.fit(x_train1,y_train1,epochs=50,batch_size=16,
           validation_data=(x_valid1,y_valid1),
-          callbacks=cb(fw1));
+          callbacks=cb(model_weights));
 
-model.load_weights(fw1)
-model.evaluate(x_test1,y_test1)
+model.load_weights(model_weights)
+model.evaluate(x_test1,y_test1,verbose=0)
 
-model=mlp_model(128)
-model.fit(x_train2,y_train2,epochs=50,batch_size=16,
+model=mlp_model(img_size2,num_classes2)
+model.fit(x_train2,y_train2,epochs=50,batch_size=64,
           validation_data=(x_valid2,y_valid2),
-          callbacks=cb(fw2))
+          callbacks=cb(model_weights))
 
-model.load_weights(fw2)
-model.evaluate(x_test2,y_test2)
+model.load_weights(model_weights)
+model.evaluate(x_test2,y_test2,verbose=0)
 
-"""CNN"""
+"""<h2 style='font-family:Aladin; color:#ff603b;'>CNN</h2>"""
 
-def cnn_model(s):
+def cnn_model(img_size,num_classes):
     model=tf.keras.models.Sequential([
-        tf.keras.layers.Conv2D(32,(5,5),padding='same',
-                               input_shape=(s,s,3)),
-        tf.keras.layers.Activation('relu'),
-        tf.keras.layers.MaxPooling2D(pool_size=(2,2)),
-        tf.keras.layers.Dropout(.25),
-        tf.keras.layers.Conv2D(196,(5,5)),
-        tf.keras.layers.Activation('relu'),    
-        tf.keras.layers.MaxPooling2D(pool_size=(2,2)),
-        tf.keras.layers.Dropout(.25),
-        tf.keras.layers.GlobalMaxPooling2D(),    
-        tf.keras.layers.Dense(512),
-        tf.keras.layers.Activation('relu'),
-        tf.keras.layers.Dropout(.25),
-        tf.keras.layers.Dense(128),
-        tf.keras.layers.Activation('relu'),
-        tf.keras.layers.Dropout(.25),
-        tf.keras.layers.Dense(10,activation='softmax')
-    ])
-    model.compile(optimizer='adam',
-                  loss='categorical_crossentropy',
+        tkl.Conv2D(32,(5,5),padding='same',
+                   input_shape=(img_size,img_size,3)),
+        tkl.LeakyReLU(alpha=.02),
+        tkl.MaxPooling2D(pool_size=(2,2)),
+        tkl.Dropout(.25),
+        tkl.Conv2D(196,(5,5)),
+        tkl.LeakyReLU(alpha=.02),    
+        tkl.MaxPooling2D(pool_size=(2,2)),
+        tkl.Dropout(.25),
+        tkl.GlobalMaxPooling2D(),    
+        tkl.Dense(512),tkl.LeakyReLU(alpha=.02),
+        tkl.Dropout(.25),
+        tkl.Dense(128),tkl.LeakyReLU(alpha=.02),
+        tkl.Dropout(.25),
+        tkl.Dense(num_classes,activation='softmax')])
+    model.compile(optimizer='nadam',
+                  loss='sparse_categorical_crossentropy',
                   metrics=['accuracy'])
     return model
 
-model=cnn_model(32)
-model.fit(x_train1,cy_train1,epochs=150,batch_size=64,
-          validation_data=(x_valid1,cy_valid1),
-          callbacks=cb(fw1))
+model=cnn_model(img_size1,num_classes1)
+model.fit(x_train1,y_train1,epochs=150,batch_size=64,
+          validation_data=(x_valid1,y_valid1),
+          callbacks=cb(model_weights))
 
-model.load_weights(fw1)
-model.evaluate(x_test1,cy_test1)
+model.load_weights(model_weights)
+model.evaluate(x_test1,y_test1,verbose=0)
 
-model=cnn_model(128)
-model.fit(x_train2,cy_train2,epochs=100,batch_size=64,
-          validation_data=(x_valid2,cy_valid2),
-          callbacks=cb(fw2))
+model=cnn_model(img_size2,num_classes2)
+model.fit(x_train2,y_train2,epochs=100,batch_size=64,
+          validation_data=(x_valid2,y_valid2),
+          callbacks=cb(model_weights))
 
-model.load_weights(fw2)
-model.evaluate(x_test2,cy_test2)
+model.load_weights(model_weights)
+model.evaluate(x_test2,y_test2,verbose=0)
 
-"""RNN"""
+"""<h2 style='font-family:Aladin; color:#ff603b;'>RNN</h2>"""
 
-def rnn_model(s,h):
+def rnn_model(img_size,hidden,num_classes):
     model=tf.keras.models.Sequential([
-        tf.keras.layers.BatchNormalization(input_shape=(1,s*s*3)),
-        tf.keras.layers.LSTM(h,return_sequences=True), 
-        tf.keras.layers.LSTM(h,return_sequences=True),
-        tf.keras.layers.LSTM(h),         
-        tf.keras.layers.Dense(10,activation='softmax')
-    ])
-    model.compile(loss='categorical_crossentropy',
+        tkl.BatchNormalization(input_shape=(1,3*img_size**2)),
+        tkl.LSTM(hidden,return_sequences=True), 
+        tkl.LSTM(hidden,return_sequences=True),
+        tkl.LSTM(hidden),         
+        tkl.Dense(num_classes,activation='softmax')])
+    model.compile(loss='sparse_categorical_crossentropy',
                   optimizer='nadam',metrics=['accuracy'])    
     return model
 
-model=rnn_model(32,96)
-model.fit(x_train1.reshape(-1,1,32*32*3),cy_train1,
-          epochs=50,batch_size=128,
-          validation_data=(x_valid1.reshape(-1,1,32*32*3),
-                           cy_valid1),
-          callbacks=cb(fw1))
+hidden1=196
+model=rnn_model(img_size1,hidden1,num_classes1)
+model.fit(
+    x_train1.reshape(-1,1,3*img_size1**2),y_train1,
+    epochs=50,batch_size=128,callbacks=cb(model_weights),
+    validation_data=(x_valid1.reshape(-1,1,3*img_size1**2),
+                     y_valid1))
 
-model.load_weights(fw1)
-model.evaluate(x_test1.reshape(-1,1,32*32*3),cy_test1)
+model.load_weights(model_weights)
+model.evaluate(
+    x_test1.reshape(-1,1,3*img_size1**2),y_test1)
 
-model=rnn_model(128,256)
-model.fit(x_train2.reshape(-1,1,128*128*3),cy_train2,
-          epochs=50,batch_size=128,
-          validation_data=(x_valid2.reshape(-1,1,128*128*3),
-                           cy_valid2),
-          callbacks=cb(fw2))
+hidden2=256
+model=rnn_model(img_size2,hidden2,num_classes2)
+model.fit(
+    x_train2.reshape(-1,1,3*img_size2**2),y_train2,
+    epochs=50,batch_size=64,callbacks=cb(model_weights),
+    validation_data=(x_valid2.reshape(-1,1,3*img_size2**2),
+                     y_valid2))
 
-model.load_weights(fw2)
-model.evaluate(x_test2.reshape(-1,1,128*128*3),cy_test2)
+model.load_weights(model_weights)
+model.evaluate(
+    x_test2.reshape(-1,1,3*img_size2**2),y_test2)
