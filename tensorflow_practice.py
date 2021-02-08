@@ -162,7 +162,7 @@ origin2style(origin,style,hub_path)
 
 def cb(model_weights):
     early_stopping=tf.keras.callbacks.EarlyStopping(
-        monitor='val_loss',patience=20,verbose=2)
+        monitor='val_accuracy',patience=20,verbose=2)
     checkpointer=tf.keras.callbacks.ModelCheckpoint(
 filepath=model_weights,verbose=int(2),save_weights_only=True,
     monitor='val_accuracy',mode='max',save_best_only=True)
@@ -250,9 +250,12 @@ model.evaluate(x_test2,y_test2,verbose=0)
 def rnn_model(img_size,hidden,num_classes):
     model=tf.keras.models.Sequential([
         tkl.BatchNormalization(input_shape=(1,3*img_size**2)),
-        tkl.LSTM(hidden,return_sequences=True), 
         tkl.LSTM(hidden,return_sequences=True),
-        tkl.LSTM(hidden),         
+        tkl.LSTM(hidden,return_sequences=True),
+        tkl.LSTM(hidden),#tkl.Reshape((1,hidden)),
+#        tkl.GlobalMaxPooling1D(),
+#        tkl.Dense(512),tkl.LeakyReLU(alpha=.02),
+#        tkl.Dropout(.5),
         tkl.Dense(num_classes,activation='softmax')])
     model.compile(loss='sparse_categorical_crossentropy',
                   optimizer='nadam',metrics=['accuracy'])    
