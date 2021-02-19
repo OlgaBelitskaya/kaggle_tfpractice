@@ -152,22 +152,24 @@ class ESPCNCallback(tf.keras.callbacks.Callback):
     def on_test_batch_end(self,batch,logs=None):
         self.psnr.append(10*math.log10(1/logs['loss']))
 
-early_stopping=tkc.EarlyStopping(monitor='loss',patience=10)
+early_stopping=tkc.EarlyStopping(monitor='loss',verbose=2,patience=10)
 checkpoint_path='/tmp/checkpoint'
 checkpoint=tkc.ModelCheckpoint(
     filepath=checkpoint_path,save_weights_only=True,
     monitor='loss',mode='min',save_best_only=True,verbose=2)
+lr_reduction=tkc.ReduceLROnPlateau(
+    monitor='val_loss',patience=10,verbose=2,factor=.9)
 
 # Commented out IPython magic to ensure Python compatibility.
 # %radial_gradient_header Model Compiling and Training|24
 
 model=model(upscale_factor=upscale_factor,channels=1)
 model.summary()
-callbacks=[ESPCNCallback(),early_stopping,checkpoint]
+callbacks=[ESPCNCallback(),early_stopping,checkpoint,lr_reduction]
 loss_fn=tf.keras.losses.MeanSquaredError()
 optimizer=tf.keras.optimizers.Adam(learning_rate=.001)
 
-epochs=200
+epochs=300
 model.compile(optimizer=optimizer,loss=loss_fn,)
 history=model.fit(
     train_ds,epochs=epochs,callbacks=callbacks,
@@ -183,8 +185,8 @@ pl.grid(); pl.title(history_keys[1]);
 # %radial_gradient_header Test Results|24
 
 # Commented out IPython magic to ensure Python compatibility.
-total_bicubic_psnr=0.; total_test_psnr=0.
-for index,test_path in enumerate(test_paths[5:10]):
+total_bicubic_psnr=0.; total_test_psnr=0.; n_img=10
+for index,test_path in enumerate(test_paths[5:5+n_img]):
     img=load_img(test_path)
     lowres_input=low_resolution_img(img,upscale_factor)
     w=lowres_input.size[0]*upscale_factor
@@ -208,6 +210,6 @@ for index,test_path in enumerate(test_paths[5:10]):
     display_results(highres_img,index,'high resolution')
     display_results(predict_img,index,'prediction')
 print('avg. PSNR of images with low resolution is %.4f'\
-#       %(total_bicubic_psnr/10))
+#       %(total_bicubic_psnr/n_img))
 print('avg. PSNR of reconstructions is %.4f'\
-#       %(total_test_psnr/10))
+#       %(total_test_psnr/n_img))
